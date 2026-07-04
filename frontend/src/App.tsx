@@ -35,6 +35,8 @@ export default function App() {
 
   // ピッキング
   const [pickingChecked, setPickingChecked] = useState<Record<string, boolean>>({});
+  const [pickingViewMode, setPickingViewMode] = useState<"list" | "card">("list");
+  const [currentPlatformIdx, setCurrentPlatformIdx] = useState(0);
   // 梱包
   const [currentPackingIdx, setCurrentPackingIdx] = useState(0);
   const [packingSetChecked, setPackingSetChecked] = useState<Record<string, Record<string, boolean>>>({});
@@ -267,104 +269,162 @@ export default function App() {
 
     const allChecked = pickingProgress.done === pickingProgress.total && pickingProgress.total > 0;
 
+    // カードモード用: 現在表示中のプラットフォーム
+    const safeIdx = Math.min(currentPlatformIdx, sortedPlatforms.length - 1);
+    const currentPlatform = sortedPlatforms[safeIdx];
+    const currentItems = currentPlatform ? platformGroups.get(currentPlatform) || [] : [];
+    const cardGroupDone = currentItems.filter((i) => pickingChecked[i.name]).length;
+
+    // ---- チェックボックス行の共通レンダー ----
+    const renderPickingItem = (item: PickingItem) => {
+      const checked = !!pickingChecked[item.name];
+      return (
+        <button
+          key={item.name}
+          onClick={() => handlePickingToggle(item.name)}
+          className={`w-full flex items-center gap-3 rounded-xl p-4 text-left 
+                      transition-all min-h-[60px] ${
+            checked
+              ? "bg-gray-900/50 border border-gray-800"
+              : "bg-gray-900 border border-gray-700 hover:border-emerald-600"
+          }`}
+        >
+          <div className={`w-7 h-7 rounded-md border-2 flex items-center justify-center shrink-0 ${
+            checked ? "bg-emerald-600 border-emerald-500" : "border-gray-600"
+          }`}>
+            {checked && <span className="text-white text-sm">✓</span>}
+          </div>
+          <div className={`flex-1 min-w-0 ${checked ? "opacity-40" : ""}`}>
+            <p className={`text-base break-words ${checked ? "line-through" : "font-medium"}`}>
+              {item.name}
+            </p>
+            {item.sources.length > 0 && (
+              <p className="text-xs text-gray-500 mt-0.5 break-words">
+                {item.sources.join(" + ")}
+              </p>
+            )}
+          </div>
+          <span className={`text-xl font-bold shrink-0 ${
+            checked ? "text-gray-600" : "text-emerald-400"
+          }`}>
+            ×{item.totalQty}
+          </span>
+        </button>
+      );
+    };
+
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
-          <div className="max-w-[780px] mx-auto flex items-center justify-between">
-            <button onClick={() => { setSelectedCarrier(null); setPhase("home"); }} className="text-gray-400 hover:text-white min-h-[44px] px-2">
-              ← 戻る
-            </button>
-            <h2 className="font-bold text-emerald-400">ピッキング ─ {carrierData.label}</h2>
-            <span className="text-sm text-gray-400">
-              {pickingProgress.done}/{pickingProgress.total}
-            </span>
-          </div>
-          {/* プログレスバー */}
-          <div className="max-w-[780px] mx-auto mt-2">
-            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
-                style={{ width: `${pickingProgress.total > 0 ? (pickingProgress.done / pickingProgress.total) * 100 : 0}%` }}
-              />
+          <div className="max-w-[780px] mx-auto">
+            <div className="flex items-center justify-between">
+              <button onClick={() => { setSelectedCarrier(null); setPhase("home"); }} className="text-gray-400 hover:text-white min-h-[44px] px-2">
+                ← 戻る
+              </button>
+              <h2 className="font-bold text-emerald-400">ピッキング ─ {carrierData.label}</h2>
+              <span className="text-sm text-gray-400">
+                {pickingProgress.done}/{pickingProgress.total}
+              </span>
+            </div>
+            {/* プログレスバー + ビュー切替 */}
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
+                  style={{ width: `${pickingProgress.total > 0 ? (pickingProgress.done / pickingProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setPickingViewMode((m) => (m === "list" ? "card" : "list"));
+                  setCurrentPlatformIdx(0);
+                }}
+                className="shrink-0 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded min-h-[32px]"
+              >
+                {pickingViewMode === "list" ? "📇 カード" : "📋 一覧"}
+              </button>
             </div>
           </div>
         </header>
 
-        {/* ピッキングリスト */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="max-w-[780px] mx-auto space-y-6 pt-1">
-            {sortedPlatforms.map((platform) => {
-              const items = platformGroups.get(platform)!;
-              const groupDone = items.filter((i) => pickingChecked[i.name]).length;
-              const groupTotal = items.length;
-
-              return (
-                <div key={platform}>
-                  {/* プラットフォームヘッダ */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-emerald-800 text-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">
-                      {platform}
-                    </span>
-                    <span className="text-gray-500 text-sm">
-                      {groupDone}/{groupTotal}
-                    </span>
-                    {groupDone === groupTotal && groupTotal > 0 && (
-                      <span className="text-emerald-400 text-sm">✓</span>
-                    )}
+        {/* ===== 一覧モード ===== */}
+        {pickingViewMode === "list" && (
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-[780px] mx-auto space-y-6 pt-1">
+              {sortedPlatforms.map((platform) => {
+                const items = platformGroups.get(platform)!;
+                const groupDone = items.filter((i) => pickingChecked[i.name]).length;
+                const groupTotal = items.length;
+                return (
+                  <div key={platform}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="bg-emerald-800 text-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">
+                        {platform}
+                      </span>
+                      <span className="text-gray-500 text-sm">{groupDone}/{groupTotal}</span>
+                      {groupDone === groupTotal && groupTotal > 0 && (
+                        <span className="text-emerald-400 text-sm">✓</span>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {items.map(renderPickingItem)}
+                    </div>
                   </div>
-
-                  {/* アイテム一覧 */}
-                  <div className="space-y-1">
-                    {items.map((item) => {
-                      const checked = !!pickingChecked[item.name];
-                      return (
-                        <button
-                          key={item.name}
-                          onClick={() => handlePickingToggle(item.name)}
-                          className={`w-full flex items-center gap-3 rounded-xl p-4 text-left 
-                                      transition-all min-h-[60px] ${
-                            checked
-                              ? "bg-gray-900/50 border border-gray-800"
-                              : "bg-gray-900 border border-gray-700 hover:border-emerald-600"
-                          }`}
-                        >
-                          {/* チェックボックス */}
-                          <div className={`w-7 h-7 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                            checked
-                              ? "bg-emerald-600 border-emerald-500"
-                              : "border-gray-600"
-                          }`}>
-                            {checked && <span className="text-white text-sm">✓</span>}
-                          </div>
-
-                          {/* 部品名 */}
-                          <div className={`flex-1 min-w-0 ${checked ? "opacity-40" : ""}`}>
-                            <p className={`text-base break-words ${checked ? "line-through" : "font-medium"}`}>
-                              {item.name}
-                            </p>
-                            {item.sources.length > 0 && (
-                              <p className="text-xs text-gray-500 mt-0.5 break-words">
-                                {item.sources.join(" + ")}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* 数量 */}
-                          <span className={`text-xl font-bold shrink-0 ${
-                            checked ? "text-gray-600" : "text-emerald-400"
-                          }`}>
-                            ×{item.totalQty}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ===== カードモード ===== */}
+        {pickingViewMode === "card" && currentPlatform && (
+          <div className="flex-1 flex flex-col p-4">
+            <div className="max-w-[780px] mx-auto w-full flex-1 flex flex-col">
+              {/* プラットフォームナビ */}
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setCurrentPlatformIdx((i) => Math.max(0, i - 1))}
+                  disabled={safeIdx === 0}
+                  className={`px-4 py-2 rounded-lg text-lg font-bold min-h-[48px] min-w-[60px] ${
+                    safeIdx === 0
+                      ? "bg-gray-900 text-gray-700 cursor-not-allowed"
+                      : "bg-gray-800 hover:bg-gray-700 text-white"
+                  }`}
+                >
+                  ‹
+                </button>
+
+                <div className="text-center flex-1">
+                  <span className="bg-emerald-700 text-emerald-100 px-4 py-2 rounded-xl text-xl font-bold">
+                    {currentPlatform}
+                  </span>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {safeIdx + 1}/{sortedPlatforms.length} プラットフォーム ─ {cardGroupDone}/{currentItems.length}
+                    {cardGroupDone === currentItems.length && currentItems.length > 0 && " ✓"}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setCurrentPlatformIdx((i) => Math.min(sortedPlatforms.length - 1, i + 1))}
+                  disabled={safeIdx >= sortedPlatforms.length - 1}
+                  className={`px-4 py-2 rounded-lg text-lg font-bold min-h-[48px] min-w-[60px] ${
+                    safeIdx >= sortedPlatforms.length - 1
+                      ? "bg-gray-900 text-gray-700 cursor-not-allowed"
+                      : "bg-gray-800 hover:bg-gray-700 text-white"
+                  }`}
+                >
+                  ›
+                </button>
+              </div>
+
+              {/* カード内アイテム */}
+              <div className="flex-1 overflow-y-auto space-y-1">
+                {currentItems.map(renderPickingItem)}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 底部ボタン（常に表示） */}
         <div className="sticky bottom-0 bg-gray-950 border-t border-gray-800 p-4">
@@ -435,7 +495,7 @@ export default function App() {
     const orderChecks = packingSetChecked[mgmtNo] || {};
 
     // 全商品のセットチェックリストを構築
-    const allCheckItems: { label: string; key: string; isAlert?: boolean }[] = [];
+    const allCheckItems: { label: string; key: string; isAlert?: boolean; index?: number; total?: number }[] = [];
 
     // 梱包時アラートを収集 → チェック項目として追加
     for (const product of currentOrder.products) {
@@ -457,17 +517,26 @@ export default function App() {
     for (const product of currentOrder.products) {
       if (product.isSet && product.setComponents.length > 0) {
         for (const comp of product.setComponents) {
-          for (let i = 0; i < comp.qty * product.qty; i++) {
+          const totalCount = comp.qty * product.qty;
+          for (let i = 0; i < totalCount; i++) {
             const key = `${product.code}_${comp.name}_${i}`;
-            allCheckItems.push({ label: comp.name, key });
+            allCheckItems.push({
+              label: comp.name,
+              key,
+              index: totalCount > 1 ? i + 1 : undefined,
+              total: totalCount > 1 ? totalCount : undefined,
+            });
           }
         }
       } else {
-        for (let i = 0; i < product.qty; i++) {
+        const totalCount = product.qty;
+        for (let i = 0; i < totalCount; i++) {
           const key = `${product.code}_single_${i}`;
           allCheckItems.push({
             label: product.shortName || product.name,
             key,
+            index: totalCount > 1 ? i + 1 : undefined,
+            total: totalCount > 1 ? totalCount : undefined,
           });
         }
       }
@@ -552,10 +621,17 @@ export default function App() {
             {/* 商品ごとのセクション */}
             {currentOrder.products.map((product, pIdx) => (
               <div key={`${product.code}_${pIdx}`} className="mb-4">
-                {/* 商品ヘッダ — カラー大きく表示 */}
+                {/* 商品ヘッダ — カラー・数量を大きく表示 */}
                 <div className="bg-gray-900 rounded-t-xl p-3 border border-gray-800 border-b-0">
-                  <p className="font-bold text-base break-words">{product.shortName || product.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">{product.code}{product.qty > 1 && ` ×${product.qty}`}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold text-base break-words flex-1">{product.shortName || product.name}</p>
+                    {product.qty > 1 && (
+                      <span className="shrink-0 bg-red-600 text-white text-lg font-bold px-3 py-1 rounded-lg">
+                        ×{product.qty}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{product.code}</p>
                   {product.attr1 && (
                     <p className="text-base text-amber-300 font-bold mt-1">
                       カラー: {product.attr1}
@@ -594,6 +670,13 @@ export default function App() {
                           <span className={`flex-1 break-words ${checked ? "line-through text-gray-600" : "text-gray-200"}`}>
                             {item.label}
                           </span>
+                          {item.total && (
+                            <span className={`shrink-0 text-sm font-bold px-2 py-0.5 rounded ${
+                              checked ? "bg-gray-800 text-gray-600" : "bg-blue-900 text-blue-300"
+                            }`}>
+                              {item.index}/{item.total}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
