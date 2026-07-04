@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { parseCSV, type ParsedData, type CarrierData, type PickingItem, type Order, type Product } from "./parsers";
-import { type Platform, PLATFORMS, needsTouchPenAlert } from "./platformDetector";
+import { type Platform, PLATFORMS, needsTouchPenAlert, POKEMON_BATTERY_GROUP, isPokemonBatteryProduct } from "./platformDetector";
 import SettingsScreen from "./SettingsScreen";
 
 // ============================================================
@@ -356,17 +356,27 @@ export default function App() {
                 const items = platformGroups.get(platform)!;
                 const groupDone = items.filter((i) => pickingChecked[i.name]).length;
                 const groupTotal = items.length;
+                const isPokemonGroup = platform === POKEMON_BATTERY_GROUP;
                 return (
                   <div key={platform}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="bg-emerald-800 text-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">
-                        {platform}
+                      <span className={`px-3 py-1 rounded-lg text-sm font-bold ${
+                        isPokemonGroup
+                          ? "bg-yellow-700 text-yellow-100"
+                          : "bg-emerald-800 text-emerald-200"
+                      }`}>
+                        {isPokemonGroup ? "⚡ " : ""}{platform}
                       </span>
                       <span className="text-gray-500 text-sm">{groupDone}/{groupTotal}</span>
                       {groupDone === groupTotal && groupTotal > 0 && (
                         <span className="text-emerald-400 text-sm">✓</span>
                       )}
                     </div>
+                    {isPokemonGroup && (
+                      <div className="bg-yellow-950 border border-yellow-800 rounded-lg p-3 mb-2 text-sm text-yellow-300">
+                        ⚡ こちらの商品はピッキングしたのちにまとめて電池交換してください
+                      </div>
+                    )}
                     <div className="space-y-1">
                       {items.map(renderPickingItem)}
                     </div>
@@ -396,8 +406,12 @@ export default function App() {
                 </button>
 
                 <div className="text-center flex-1">
-                  <span className="bg-emerald-700 text-emerald-100 px-4 py-2 rounded-xl text-xl font-bold">
-                    {currentPlatform}
+                  <span className={`px-4 py-2 rounded-xl text-xl font-bold ${
+                    currentPlatform === POKEMON_BATTERY_GROUP
+                      ? "bg-yellow-700 text-yellow-100"
+                      : "bg-emerald-700 text-emerald-100"
+                  }`}>
+                    {currentPlatform === POKEMON_BATTERY_GROUP ? "⚡ " : ""}{currentPlatform}
                   </span>
                   <p className="text-gray-500 text-sm mt-1">
                     {safeIdx + 1}/{sortedPlatforms.length} プラットフォーム ─ {cardGroupDone}/{currentItems.length}
@@ -419,6 +433,11 @@ export default function App() {
               </div>
 
               {/* カード内アイテム */}
+              {currentPlatform === POKEMON_BATTERY_GROUP && (
+                <div className="bg-yellow-950 border border-yellow-800 rounded-lg p-3 mb-2 text-sm text-yellow-300">
+                  ⚡ こちらの商品はピッキングしたのちにまとめて電池交換してください
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto space-y-1">
                 {currentItems.map(renderPickingItem)}
               </div>

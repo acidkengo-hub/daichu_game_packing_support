@@ -598,6 +598,7 @@ const DEFAULT_SETS: SetDefinition[] = [
   ]},
   { id: "wii-balanceboadset01", label: "Wiiバランスボード+Fit", codes: ["wii-balanceboadset01"], prefixes: [], components: [
     { name: "Wiiバランスボード", qty: 1 }, { name: "Wiiソフト「WiiFit/Plus」", qty: 1 },
+    { name: "単三電池", qty: 4 },
   ]},
 
   // ============================================================

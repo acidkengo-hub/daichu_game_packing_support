@@ -5,7 +5,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import Papa from "papaparse";
-import { detectPlatform, comparePlatform, type Platform } from "./platformDetector";
+import { detectPlatform, comparePlatform, isPokemonBatteryProduct, POKEMON_BATTERY_GROUP, type Platform } from "./platformDetector";
 import { findSetDefinition, type SetComponent } from "./setDefinitions";
 
 // ============================================================
@@ -146,31 +146,54 @@ function buildProduct(row: string[]): Product {
   // スペース正規化（全角/半角スペースの差による分裂を防止）
   const shortName = normalizeSpaces(rawShortName);
   const name = normalizeSpaces(rawName);
-  const platform = detectPlatform(shortName, code);
+  const attr1 = getField(row, COL.ATTR1_NAME);
+  let platform: Platform | string = detectPlatform(shortName, code);
+
+  // ポケモン電池交換対象 → 特別グループに分類
+  const isPokemon = isPokemonBatteryProduct(code);
+  if (isPokemon) {
+    platform = POKEMON_BATTERY_GROUP as unknown as Platform;
+  }
 
   // 品目がCROSS MALLの文字数制限で切られている場合は商品名（フル）を使う
-  // 20文字未満かつ商品名の方が長ければ、商品名を採用
   const displayName =
     shortName && shortName.length >= 20
       ? shortName
       : name.length > shortName.length
         ? name
         : shortName || name;
+
   const setDef = findSetDefinition(code);
   const isSet = !!setDef && setDef.components.length > 0;
+
+  // 電池セットの動的計算: wiinomalbattset0001 は attr1 から電池本数を判定
+  let components = setDef?.components ? [...setDef.components] : [];
+  if (setDef && code.toLowerCase().startsWith("wiinomalbattset")) {
+    const batteryQty = attr1.includes("4本") ? 4 : 2;
+    // 既存の電池componentがなければ追加
+    if (!components.some((c) => c.name === "単三電池")) {
+      components = [...components, { name: "単三電池", qty: batteryQty }];
+    }
+  }
+
+  // ポケモン用梱包アラート
+  const alerts = setDef?.packingAlerts ? [...setDef.packingAlerts] : [];
+  if (isPokemon) {
+    alerts.push("ポケモンソフトは電池交換を行いましたか？");
+  }
 
   return {
     code,
     skuCode: getField(row, COL.SKU_CODE),
     name,
-    shortName: displayName,  // 品目が短すぎる場合は商品名フルを使用
-    attr1: getField(row, COL.ATTR1_NAME),
+    shortName: displayName,
+    attr1,
     attr2: getField(row, COL.ATTR2_NAME),
     qty: getNumField(row, COL.QTY),
-    platform,
+    platform: platform as Platform,
     isSet,
-    setComponents: setDef?.components ?? [],
-    packingAlerts: setDef?.packingAlerts ?? [],
+    setComponents: components,
+    packingAlerts: alerts,
   };
 }
 

@@ -193,3 +193,45 @@ export function needsTouchPenAlert(platform: Platform): boolean {
 export function needsPS4ABCheck(subType: PS4SubType): boolean {
   return subType === "PS4_1000" || subType === "PS4_2000";
 }
+
+// ============================================================
+// ポケモン電池交換判定
+// ============================================================
+
+/**
+ * 電池交換が必要なポケモンソフトの商品コード一覧。
+ * GB/GBA世代のポケモンは内蔵電池が切れるとセーブできない。
+ * DAICHUでは出荷前に電池交換を行うルール。
+ */
+const POKEMON_BATTERY_CODES: string[] = [
+  // GB ポケモン
+  "amazom1971",      // GB ポケットモンスター クリスタル
+  "amazom2111",      // GB ポケットモンスター（バリアント1）
+  "amazom2112",      // GB ポケットモンスター（バリアント2）
+  "amazon9108",      // GB ポケモン（バリアント）
+  "amazon9109",      // GB ポケモン（バリアント）
+  // GBA ポケモン
+  "amazon2307051",   // GBA ポケモン
+  "amazon2307052",   // GBA ポケモン
+  "amazon2307053",   // GBA ポケモン
+  "amazon2307054",   // GBA ポケモン
+  "amazon2307057",   // GBA ポケモン
+  "amazon202410211", // ポケモン（バリアント）
+  // セット商品（電池交換済みで出荷）
+  "gbapokesr2set",   // GBA ポケモン ルビー&サファイア 2本セット
+  "gbpokemon4set",   // GB ポケモン 初代4本セット
+];
+
+/**
+ * 商品コードがポケモン電池交換対象かどうか判定。
+ */
+export function isPokemonBatteryProduct(code: string): boolean {
+  return POKEMON_BATTERY_CODES.includes(code.toLowerCase()) ||
+         POKEMON_BATTERY_CODES.includes(code);
+}
+
+/**
+ * ピッキング時の特別グループ名。
+ * 通常のプラットフォーム分類とは別枠で表示される。
+ */
+export const POKEMON_BATTERY_GROUP = "ポケモン（電池交換）" as const;
