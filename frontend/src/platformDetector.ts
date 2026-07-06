@@ -25,6 +25,7 @@ export const PLATFORMS = [
   "Switch",
   "SS",
   "DC",
+  "ポケモン（電池交換）",
   "その他",
 ] as const;
 

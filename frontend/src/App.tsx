@@ -4,9 +4,11 @@
 // フェーズ: home → picking → packing → complete
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { parseCSV, type ParsedData, type CarrierData, type PickingItem, type Order, type Product } from "./parsers";
-import { type Platform, PLATFORMS, needsTouchPenAlert, POKEMON_BATTERY_GROUP, isPokemonBatteryProduct } from "./platformDetector";
+import { useState, useCallback, useMemo, useRef } from "react";
+import { parseCSV, type ParsedData, type CarrierData, type PickingItem, type Order } from "./parsers";
+import { type Platform, PLATFORMS, needsTouchPenAlert, POKEMON_BATTERY_GROUP } from "./platformDetector";
+import { findSetDefinition } from "./setDefinitions";
+import { getSetImageUrl } from "./imageMapping";
 import SettingsScreen from "./SettingsScreen";
 
 // ============================================================
@@ -40,6 +42,8 @@ export default function App() {
   // 梱包
   const [currentPackingIdx, setCurrentPackingIdx] = useState(0);
   const [packingSetChecked, setPackingSetChecked] = useState<Record<string, Record<string, boolean>>>({});
+  // 画像モーダル
+  const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,6 +149,31 @@ export default function App() {
   if (phase === "settings") {
     return <SettingsScreen onClose={() => setPhase("home")} />;
   }
+
+  // ============================================================
+  // 画像モーダル（全フェーズで表示可能）
+  const imageModal = imageModalUrl ? (
+    <div
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      onClick={() => setImageModalUrl(null)}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setImageModalUrl(null)}
+          className="absolute -top-3 -right-3 bg-gray-700 hover:bg-gray-600 text-white 
+                     w-10 h-10 rounded-full text-xl z-10 flex items-center justify-center"
+        >
+          ✕
+        </button>
+        <img
+          src={imageModalUrl}
+          alt="商品画像"
+          className="max-w-full max-h-[85vh] rounded-xl object-contain"
+          onError={(e) => { (e.target as HTMLImageElement).alt = "画像の読み込みに失敗"; }}
+        />
+      </div>
+    </div>
+  ) : null;
 
   // ============================================================
   // ホーム画面（CSVアップロード + キャリア選択）
@@ -438,6 +467,33 @@ export default function App() {
                   ⚡ こちらの商品はピッキングしたのちにまとめて電池交換してください
                 </div>
               )}
+              {/* 発払いカードモード: プラットフォームの代表画像があれば表示 */}
+              {selectedCarrier === "takkyubin" && (() => {
+                // 現在のプラットフォームのアイテムからセット定義画像を検索
+                for (const item of currentItems) {
+                  if (item.sources.length > 0) {
+                    // sources内のセット名からIDを推測して画像を検索
+                    const allDefs = carrierData.orders.flatMap(o => o.products).filter(p => p.isSet && p.platform === currentPlatform);
+                    for (const prod of allDefs) {
+                      const setDef = findSetDefinition(prod.code);
+                      if (setDef) {
+                        const imgUrl = getSetImageUrl(setDef.id);
+                        if (imgUrl) {
+                          return (
+                            <button
+                              onClick={() => setImageModalUrl(imgUrl)}
+                              className="mb-3 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-500 transition-colors"
+                            >
+                              <img src={imgUrl} alt={setDef.label} className="w-full max-h-[200px] object-contain bg-white" loading="lazy" />
+                            </button>
+                          );
+                        }
+                      }
+                    }
+                  }
+                }
+                return null;
+              })()}
               <div className="flex-1 overflow-y-auto space-y-1">
                 {currentItems.map(renderPickingItem)}
               </div>
@@ -509,6 +565,7 @@ export default function App() {
   // 梱包画面（1注文ずつ）
   // ============================================================
 
+
   if (phase === "packing" && carrierData && currentOrder) {
     const mgmtNo = currentOrder.mgmtNo;
     const orderChecks = packingSetChecked[mgmtNo] || {};
@@ -566,6 +623,8 @@ export default function App() {
       allCheckItems.every((item) => !!orderChecks[item.key]);
 
     return (
+      <>
+      {imageModal}
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
@@ -640,15 +699,29 @@ export default function App() {
             {/* 商品ごとのセクション */}
             {currentOrder.products.map((product, pIdx) => (
               <div key={`${product.code}_${pIdx}`} className="mb-4">
-                {/* 商品ヘッダ — カラー・数量を大きく表示 */}
+                {/* 商品ヘッダ — カラー・数量・画像ボタン */}
                 <div className="bg-gray-900 rounded-t-xl p-3 border border-gray-800 border-b-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-bold text-base break-words flex-1">{product.shortName || product.name}</p>
-                    {product.qty > 1 && (
-                      <span className="shrink-0 bg-red-600 text-white text-lg font-bold px-3 py-1 rounded-lg">
-                        ×{product.qty}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(() => {
+                        const setDef = findSetDefinition(product.code);
+                        const imgUrl = setDef ? getSetImageUrl(setDef.id) : null;
+                        return imgUrl ? (
+                          <button
+                            onClick={() => setImageModalUrl(imgUrl)}
+                            className="bg-blue-800 hover:bg-blue-700 text-white px-2 py-1 rounded-lg text-sm min-h-[36px]"
+                          >
+                            📷
+                          </button>
+                        ) : null;
+                      })()}
+                      {product.qty > 1 && (
+                        <span className="bg-red-600 text-white text-lg font-bold px-3 py-1 rounded-lg">
+                          ×{product.qty}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">{product.code}</p>
                   {product.attr1 && (
@@ -722,6 +795,7 @@ export default function App() {
           </div>
         )}
       </div>
+      </>
     );
   }
 
@@ -773,20 +847,21 @@ export default function App() {
   }
 
   // ============================================================
-  // フォールバック
-  // ============================================================
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-gray-500 mb-4">予期しない状態です</p>
-        <button
-          onClick={handleReset}
-          className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl min-h-[48px]"
-        >
-          ホームに戻る
-        </button>
+    <>
+      {imageModal}
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">予期しない状態です</p>
+          <button
+            onClick={handleReset}
+            className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl min-h-[48px]"
+          >
+            ホームに戻る
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
