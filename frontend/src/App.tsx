@@ -547,8 +547,8 @@ export default function App() {
   // 梱包画面（1注文ずつ）
   // ============================================================
 
-  // 画像モーダル（全フェーズで表示可能）
-  const imageModal = imageModalUrl ? (
+  // Image modal for all phases
+  const imageModalEl = imageModalUrl ? (
     <div
       className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={() => setImageModalUrl(null)}
@@ -562,7 +562,7 @@ export default function App() {
           ✕
         </button>
         <img
-          src={imageModalUrl}
+          src={imageModalUrl ?? undefined}
           alt="商品画像"
           className="max-w-full max-h-[85vh] rounded-xl object-contain"
           onError={(e) => { (e.target as HTMLImageElement).alt = "画像の読み込みに失敗"; }}
@@ -630,7 +630,7 @@ export default function App() {
 
     return (
       <>
-      {imageModal}
+      {imageModalEl}
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
@@ -784,10 +784,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* 次へボタン */}
-        {allItemsChecked && (
-          <div className="sticky bottom-0 bg-gray-950 border-t border-gray-800 p-4">
-            <div className="max-w-[780px] mx-auto">
+        {/* 底部ナビゲーション（常に表示） */}
+        <div className="sticky bottom-0 bg-gray-950 border-t border-gray-800 p-4">
+          <div className="max-w-[780px] mx-auto space-y-2">
+            {/* 梱包完了ボタン（全チェック時のみ） */}
+            {allItemsChecked && (
               <button
                 onClick={handleNextOrder}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 
@@ -797,9 +798,35 @@ export default function App() {
                   ? `梱包完了 → 次の注文 (${currentPackingIdx + 2}/${carrierData.orders.length})`
                   : "梱包完了 → 全注文完了"}
               </button>
+            )}
+            {/* 前後ナビゲーション */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPackingIdx((i) => Math.max(0, i - 1))}
+                disabled={currentPackingIdx === 0}
+                className={`flex-1 py-3 rounded-xl text-base min-h-[48px] ${
+                  currentPackingIdx === 0
+                    ? "bg-gray-900 text-gray-700 cursor-not-allowed"
+                    : "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                }`}
+              >
+                ‹ 前の注文
+              </button>
+              <button
+                onClick={() => {
+                  if (currentPackingIdx + 1 >= carrierData.orders.length) {
+                    setPhase("packingSummary");
+                  } else {
+                    setCurrentPackingIdx((i) => i + 1);
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl text-base min-h-[48px] bg-gray-800 hover:bg-gray-700 text-gray-300"
+              >
+                次の注文 ›
+              </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
       </>
     );
@@ -851,6 +878,36 @@ export default function App() {
       </div>
     );
   }
+
+  // ============================================================
+  // 画像モーダル（全フェーズで表示可能）
+  // ============================================================
+
+  const imageModal = imageModalUrl && (
+    <div
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      onClick={() => setImageModalUrl(null)}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setImageModalUrl(null)}
+          className="absolute -top-3 -right-3 bg-gray-700 hover:bg-gray-600 text-white 
+                     w-10 h-10 rounded-full text-xl z-10 flex items-center justify-center"
+        >
+          ✕
+        </button>
+        <img
+          src={imageModalUrl ?? undefined}
+          alt="商品画像"
+          className="max-w-full max-h-[85vh] rounded-xl object-contain"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = "";
+            (e.target as HTMLImageElement).alt = "画像の読み込みに失敗しました";
+          }}
+        />
+      </div>
+    </div>
+  );
 
   // ============================================================
   // フォールバック
