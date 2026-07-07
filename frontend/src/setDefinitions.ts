@@ -167,22 +167,22 @@ const DEFAULT_SETS: SetDefinition[] = [
   // PS3 初期型 (CECHA/CECHB/CECHH/CECHL)
   // ============================================================
   { id: "2679-002901", label: "PS3初期型 20GB CECHB00", codes: ["2679-002901"], prefixes: [], components: [
-    { name: "PS3本体(初期型)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
+    { name: "PS3本体(CECHB00/20GB)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
     { name: "DUALSHOCK3", qty: 1 }, { name: "USBケーブル(miniB/太)", qty: 1 },
     { name: "HDMIケーブル", qty: 1 },
   ]},
   { id: "ps360gcecha002", label: "PS3初期型 60GB CECHA00", codes: ["ps360gcecha002"], prefixes: [], components: [
-    { name: "PS3本体(初期型)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
+    { name: "PS3本体(CECHA00/60GB)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
     { name: "DUALSHOCK3", qty: 1 }, { name: "USBケーブル(miniB/太)", qty: 1 },
     { name: "HDMIケーブル", qty: 1 },
   ]},
-  { id: "ps3syoki3color001", label: "PS3初期型 40GB+ 3色", codes: ["ps3syoki3color001", "ps3-syoki-40gver"], prefixes: [], components: [
-    { name: "PS3本体(初期型)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
+  { id: "ps3syoki3color001", label: "PS3初期型 40GB+ CECHH/L", codes: ["ps3syoki3color001", "ps3-syoki-40gver"], prefixes: [], components: [
+    { name: "PS3本体(CECHH00,CECHL00/40GB+)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
     { name: "DUALSHOCK3", qty: 1 }, { name: "USBケーブル(miniB/太)", qty: 1 },
     { name: "HDMIケーブル", qty: 1 },
   ]},
-  { id: "ps3ffset0001", label: "PS3 FF7限定モデル", codes: ["ps3ffset0001"], prefixes: [], components: [
-    { name: "PS3本体(初期型)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
+  { id: "ps3ffset0001", label: "PS3 FF7限定モデル(CECHA00)", codes: ["ps3ffset0001"], prefixes: [], components: [
+    { name: "PS3本体(CECHA00/60GB)", qty: 1 }, { name: "三芯ケーブル", qty: 1 },
     { name: "DUALSHOCK3", qty: 1 }, { name: "USBケーブル(miniB/太)", qty: 1 },
     { name: "AVケーブル(PS3初期型)", qty: 1 },
   ]},

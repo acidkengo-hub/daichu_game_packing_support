@@ -28,6 +28,7 @@ type Phase =
 // PS2/PS3/PS4/PS5の型番をテキストから検出し、強調表示するJSXを返す
 // ============================================================
 
+// split + regex のマッチ判定を正確に行うバージョン
 function renderWithModelHighlight(text: string): React.ReactNode {
   const result: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -546,8 +547,8 @@ export default function App() {
   // 梱包画面（1注文ずつ）
   // ============================================================
 
-  // Image modal for all phases
-  const imageModalEl = imageModalUrl ? (
+  // 画像モーダル（全フェーズで表示可能）
+  const imageModal = imageModalUrl ? (
     <div
       className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={() => setImageModalUrl(null)}
@@ -594,12 +595,13 @@ export default function App() {
       }
     }
 
-    for (const product of currentOrder.products) {
+    for (let pIdx = 0; pIdx < currentOrder.products.length; pIdx++) {
+      const product = currentOrder.products[pIdx];
       if (product.isSet && product.setComponents.length > 0) {
         for (const comp of product.setComponents) {
           const totalCount = comp.qty * product.qty;
           for (let i = 0; i < totalCount; i++) {
-            const key = `${product.code}_${comp.name}_${i}`;
+            const key = `p${pIdx}_${product.code}_${comp.name}_${i}`;
             allCheckItems.push({
               label: comp.name,
               key,
@@ -611,7 +613,7 @@ export default function App() {
       } else {
         const totalCount = product.qty;
         for (let i = 0; i < totalCount; i++) {
-          const key = `${product.code}_single_${i}`;
+          const key = `p${pIdx}_${product.code}_single_${i}`;
           allCheckItems.push({
             label: product.shortName || product.name,
             key,
@@ -628,7 +630,7 @@ export default function App() {
 
     return (
       <>
-      {imageModalEl}
+      {imageModal}
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
@@ -746,7 +748,7 @@ export default function App() {
                 {/* チェックリスト */}
                 <div className="border border-gray-800 rounded-b-xl overflow-hidden">
                   {allCheckItems
-                    .filter((item) => !item.isAlert && item.key.startsWith(`${product.code}_`))
+                    .filter((item) => !item.isAlert && item.key.startsWith(`p${pIdx}_${product.code}_`))
                     .map((item) => {
                       const checked = !!orderChecks[item.key];
                       return (
@@ -849,36 +851,6 @@ export default function App() {
       </div>
     );
   }
-
-  // ============================================================
-  // 画像モーダル（全フェーズで表示可能）
-  // ============================================================
-
-  const imageModal = imageModalUrl && (
-    <div
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-      onClick={() => setImageModalUrl(null)}
-    >
-      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={() => setImageModalUrl(null)}
-          className="absolute -top-3 -right-3 bg-gray-700 hover:bg-gray-600 text-white 
-                     w-10 h-10 rounded-full text-xl z-10 flex items-center justify-center"
-        >
-          ✕
-        </button>
-        <img
-          src={imageModalUrl}
-          alt="商品画像"
-          className="max-w-full max-h-[85vh] rounded-xl object-contain"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = "";
-            (e.target as HTMLImageElement).alt = "画像の読み込みに失敗しました";
-          }}
-        />
-      </div>
-    </div>
-  );
 
   // ============================================================
   // フォールバック
