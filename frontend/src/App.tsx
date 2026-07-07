@@ -24,6 +24,39 @@ type Phase =
   | "settings";
 
 // ============================================================
+// 型番ハイライト
+// PS2/PS3/PS4/PS5の型番をテキストから検出し、強調表示するJSXを返す
+// ============================================================
+
+function renderWithModelHighlight(text: string): React.ReactNode {
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  const regex = /(SCPH-\d{4,5}[A-Z]?|CECH[A-Z]\d{2,3}|CECH-\d{4,5}[A-Z]?|CUH-\d{4,5}[A-Z]?|CFI-\d{4,5}[A-Z]?\d{0,2}|CFH-\d{4,5}[A-Z]?\d{0,2})/gi;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // マッチ前のテキスト
+    if (match.index > lastIndex) {
+      result.push(text.slice(lastIndex, match.index));
+    }
+    // ハイライトされた型番
+    result.push(
+      <span key={match.index} className="bg-yellow-400 text-gray-900 font-bold px-1 mx-0.5 rounded text-sm">
+        {match[0]}
+      </span>
+    );
+    lastIndex = regex.lastIndex;
+  }
+
+  // 残りのテキスト
+  if (lastIndex < text.length) {
+    result.push(text.slice(lastIndex));
+  }
+
+  return result.length > 0 ? result : text;
+}
+
+// ============================================================
 // App
 // ============================================================
 
@@ -149,31 +182,6 @@ export default function App() {
   if (phase === "settings") {
     return <SettingsScreen onClose={() => setPhase("home")} />;
   }
-
-  // ============================================================
-  // 画像モーダル（全フェーズで表示可能）
-  const imageModal = imageModalUrl ? (
-    <div
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-      onClick={() => setImageModalUrl(null)}
-    >
-      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={() => setImageModalUrl(null)}
-          className="absolute -top-3 -right-3 bg-gray-700 hover:bg-gray-600 text-white 
-                     w-10 h-10 rounded-full text-xl z-10 flex items-center justify-center"
-        >
-          ✕
-        </button>
-        <img
-          src={imageModalUrl}
-          alt="商品画像"
-          className="max-w-full max-h-[85vh] rounded-xl object-contain"
-          onError={(e) => { (e.target as HTMLImageElement).alt = "画像の読み込みに失敗"; }}
-        />
-      </div>
-    </div>
-  ) : null;
 
   // ============================================================
   // ホーム画面（CSVアップロード + キャリア選択）
@@ -325,7 +333,7 @@ export default function App() {
           </div>
           <div className={`flex-1 min-w-0 ${checked ? "opacity-40" : ""}`}>
             <p className={`text-base break-words ${checked ? "line-through" : "font-medium"}`}>
-              {item.name}
+              {renderWithModelHighlight(item.name)}
             </p>
             {item.sources.length > 0 && (
               <p className="text-xs text-gray-500 mt-0.5 break-words">
@@ -467,33 +475,6 @@ export default function App() {
                   ⚡ こちらの商品はピッキングしたのちにまとめて電池交換してください
                 </div>
               )}
-              {/* 発払いカードモード: プラットフォームの代表画像があれば表示 */}
-              {selectedCarrier === "takkyubin" && (() => {
-                // 現在のプラットフォームのアイテムからセット定義画像を検索
-                for (const item of currentItems) {
-                  if (item.sources.length > 0) {
-                    // sources内のセット名からIDを推測して画像を検索
-                    const allDefs = carrierData.orders.flatMap(o => o.products).filter(p => p.isSet && p.platform === currentPlatform);
-                    for (const prod of allDefs) {
-                      const setDef = findSetDefinition(prod.code);
-                      if (setDef) {
-                        const imgUrl = getSetImageUrl(setDef.id);
-                        if (imgUrl) {
-                          return (
-                            <button
-                              onClick={() => setImageModalUrl(imgUrl)}
-                              className="mb-3 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-500 transition-colors"
-                            >
-                              <img src={imgUrl} alt={setDef.label} className="w-full max-h-[200px] object-contain bg-white" loading="lazy" />
-                            </button>
-                          );
-                        }
-                      }
-                    }
-                  }
-                }
-                return null;
-              })()}
               <div className="flex-1 overflow-y-auto space-y-1">
                 {currentItems.map(renderPickingItem)}
               </div>
@@ -565,6 +546,29 @@ export default function App() {
   // 梱包画面（1注文ずつ）
   // ============================================================
 
+  // Image modal for all phases
+  const imageModalEl = imageModalUrl ? (
+    <div
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      onClick={() => setImageModalUrl(null)}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setImageModalUrl(null)}
+          className="absolute -top-3 -right-3 bg-gray-700 hover:bg-gray-600 text-white 
+                     w-10 h-10 rounded-full text-xl z-10 flex items-center justify-center"
+        >
+          ✕
+        </button>
+        <img
+          src={imageModalUrl}
+          alt="商品画像"
+          className="max-w-full max-h-[85vh] rounded-xl object-contain"
+          onError={(e) => { (e.target as HTMLImageElement).alt = "画像の読み込みに失敗"; }}
+        />
+      </div>
+    </div>
+  ) : null;
 
   if (phase === "packing" && carrierData && currentOrder) {
     const mgmtNo = currentOrder.mgmtNo;
@@ -624,7 +628,7 @@ export default function App() {
 
     return (
       <>
-      {imageModal}
+      {imageModalEl}
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
@@ -702,7 +706,7 @@ export default function App() {
                 {/* 商品ヘッダ — カラー・数量・画像ボタン */}
                 <div className="bg-gray-900 rounded-t-xl p-3 border border-gray-800 border-b-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-base break-words flex-1">{product.shortName || product.name}</p>
+                    <p className="font-bold text-base break-words flex-1">{renderWithModelHighlight(product.shortName || product.name)}</p>
                     <div className="flex items-center gap-2 shrink-0">
                       {(() => {
                         const setDef = findSetDefinition(product.code);
@@ -846,6 +850,38 @@ export default function App() {
     );
   }
 
+  // ============================================================
+  // 画像モーダル（全フェーズで表示可能）
+  // ============================================================
+
+  const imageModal = imageModalUrl && (
+    <div
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      onClick={() => setImageModalUrl(null)}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setImageModalUrl(null)}
+          className="absolute -top-3 -right-3 bg-gray-700 hover:bg-gray-600 text-white 
+                     w-10 h-10 rounded-full text-xl z-10 flex items-center justify-center"
+        >
+          ✕
+        </button>
+        <img
+          src={imageModalUrl}
+          alt="商品画像"
+          className="max-w-full max-h-[85vh] rounded-xl object-contain"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = "";
+            (e.target as HTMLImageElement).alt = "画像の読み込みに失敗しました";
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // フォールバック
   // ============================================================
 
   return (
