@@ -9,6 +9,7 @@ import { parseCSV, type ParsedData, type CarrierData, type PickingItem, type Ord
 import { type Platform, PLATFORMS, needsTouchPenAlert, POKEMON_BATTERY_GROUP } from "./platformDetector";
 import { findSetDefinition } from "./setDefinitions";
 import { getSetImageUrl } from "./imageMapping";
+import { detectShop, isFlyerAlertEnabled, FLYER_ALERT_TEXT } from "./shopColors";
 import SettingsScreen from "./SettingsScreen";
 
 // ============================================================
@@ -575,8 +576,20 @@ export default function App() {
     const mgmtNo = currentOrder.mgmtNo;
     const orderChecks = packingSetChecked[mgmtNo] || {};
 
+    // モール判定（枠色・バッジ・チラシ対象の決定に使用）
+    const shop = detectShop(currentOrder.shopName);
+
     // 全商品のセットチェックリストを構築
     const allCheckItems: { label: string; key: string; isAlert?: boolean; index?: number; total?: number }[] = [];
+
+    // チラシ同梱アラート（楽天・ヤフショのみ、設定でON時）
+    if (shop.needsFlyer && isFlyerAlertEnabled()) {
+      allCheckItems.push({
+        label: FLYER_ALERT_TEXT,
+        key: `alert_${FLYER_ALERT_TEXT}`,
+        isAlert: true,
+      });
+    }
 
     // 梱包時アラートを収集 → チェック項目として追加
     for (const product of currentOrder.products) {
@@ -631,7 +644,7 @@ export default function App() {
     return (
       <>
       {imageModalEl}
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+      <div className={`min-h-screen bg-gray-950 text-gray-100 flex flex-col border-4 ${shop.frame}`}>
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
           <div className="max-w-[780px] mx-auto">
@@ -657,13 +670,18 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-4">
           <div className="max-w-[780px] mx-auto">
             {/* 宛先情報 */}
-            <div className="bg-gray-900 rounded-xl p-4 mb-4 border border-gray-800">
-              <p className="text-lg font-bold">{currentOrder.recipientName} 様</p>
+            <div className={`bg-gray-900 rounded-xl p-4 mb-4 border-2 ${shop.cardBorder}`}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <p className="text-lg font-bold flex-1">{currentOrder.recipientName} 様</p>
+                <span className={`shrink-0 px-3 py-1 rounded-lg text-sm font-bold ${shop.badge}`}>
+                  {shop.label}
+                </span>
+              </div>
               <p className="text-sm text-gray-400 mt-1">
                 〒{currentOrder.recipientPostal} {currentOrder.recipientAddr}
               </p>
               <p className="text-sm text-gray-500 mt-1">
-                {currentOrder.shopName} ─ 管理番号: {currentOrder.mgmtNo}
+                管理番号: {currentOrder.mgmtNo}
               </p>
               {currentOrder.deliveryDate && (
                 <p className="text-sm text-amber-400 mt-1">

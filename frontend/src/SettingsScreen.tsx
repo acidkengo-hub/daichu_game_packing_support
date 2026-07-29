@@ -12,6 +12,7 @@ import {
   removeSetDefinition,
   resetToDefaults,
 } from "./setDefinitions";
+import { isFlyerAlertEnabled, setFlyerAlertEnabled } from "./shopColors";
 
 // ============================================================
 // Props
@@ -44,6 +45,16 @@ export default function SettingsScreen({ onClose }: Props) {
   const [editingDef, setEditingDef] = useState<SetDefinition | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [flyerAlert, setFlyerAlert] = useState<boolean>(isFlyerAlertEnabled);
+
+  // --- チラシ確認アラートのON/OFF ---
+  const handleToggleFlyerAlert = useCallback(() => {
+    setFlyerAlert((prev) => {
+      const next = !prev;
+      setFlyerAlertEnabled(next);
+      return next;
+    });
+  }, []);
 
   // --- 検索フィルタ ---
   const filtered = useMemo(() => {
@@ -301,6 +312,31 @@ export default function SettingsScreen({ onClose }: Props) {
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg min-h-[48px]"
           >
             閉じる
+          </button>
+        </div>
+
+        {/* 梱包オプション */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
+          <p className="text-sm text-gray-400 mb-3">梱包オプション</p>
+          <button
+            onClick={handleToggleFlyerAlert}
+            className="w-full flex items-center justify-between gap-3 min-h-[56px] text-left"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold">📄 チラシ確認アラート</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                楽天市場・Yahoo!ショッピングの注文にチラシ同梱の確認を表示
+              </p>
+            </div>
+            <span
+              className={`shrink-0 px-4 py-2 rounded-lg text-sm font-bold ${
+                flyerAlert
+                  ? "bg-emerald-600 text-white"
+                  : "bg-gray-700 text-gray-400"
+              }`}
+            >
+              {flyerAlert ? "ON" : "OFF"}
+            </span>
           </button>
         </div>
 

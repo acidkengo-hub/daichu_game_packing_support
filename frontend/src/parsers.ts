@@ -176,6 +176,14 @@ function buildProduct(row: string[]): Product {
     }
   }
 
+  // カラーランダムの動的計算: DS系・3DS系でカラーランダムを選択された場合、
+  // おまけソフトを2本にする（指定カラーは1本のまま）
+  if (setDef && (platform === "DS" || platform === "3DS") && attr1.includes("ランダム")) {
+    components = components.map((c) =>
+      c.name.startsWith("おまけソフト") ? { ...c, qty: 2 } : c
+    );
+  }
+
   // ポケモン用梱包アラート
   const alerts = setDef?.packingAlerts ? [...setDef.packingAlerts] : [];
   if (isPokemon) {
