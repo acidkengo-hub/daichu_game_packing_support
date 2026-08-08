@@ -4,12 +4,28 @@
 // フェーズ: home → picking → packing → complete
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { parseCSV, type ParsedData, type CarrierData, type PickingItem, type Order } from "./parsers";
 import { type Platform, PLATFORMS, needsTouchPenAlert, POKEMON_BATTERY_GROUP } from "./platformDetector";
 import { findSetDefinition } from "./setDefinitions";
 import { getSetImageUrl } from "./imageMapping";
 import { detectShop, isFlyerAlertEnabled, FLYER_ALERT_TEXT } from "./shopColors";
+import {
+  type WorkDay,
+  type ShipmentSlot,
+  SLOT_LABELS,
+  SLOT_ICONS,
+  loadWorkDay,
+  saveWorkDay,
+  clearWorkDay,
+  createWorkDay,
+  createSession,
+  collectMgmtNos,
+  extractNewOrders,
+  getSessionProgress,
+  hasSeenGuide,
+  markGuideSeen,
+} from "./shipmentStore";
 import SettingsScreen from "./SettingsScreen";
 
 // ============================================================
@@ -65,9 +81,12 @@ function renderWithModelHighlight(text: string): React.ReactNode {
 export default function App() {
   // --- 状態 ---
   const [phase, setPhase] = useState<Phase>("home");
-  const [parsedData, setParsedData] = useState<ParsedData | null>(null);
+  // 午前便/午後便を保持する1日分の作業データ（localStorageから復元）
+  const [workDay, setWorkDay] = useState<WorkDay | null>(loadWorkDay);
+  const [activeSlot, setActiveSlot] = useState<ShipmentSlot | null>(null);
   const [selectedCarrier, setSelectedCarrier] = useState<"takkyubin" | "nekopos" | null>(null);
   const [error, setError] = useState<string>("");
+  const [notice, setNotice] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
 
   // ピッキング
@@ -77,16 +96,51 @@ export default function App() {
   // 梱包
   const [currentPackingIdx, setCurrentPackingIdx] = useState(0);
   const [packingSetChecked, setPackingSetChecked] = useState<Record<string, Record<string, boolean>>>({});
+  /** 梱包完了した管理番号（現在のキャリア分） */
+  const [packingDoneList, setPackingDoneList] = useState<string[]>([]);
   // 画像モーダル
   const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
+  // 初回説明バナー
+  const [showPickingGuide, setShowPickingGuide] = useState(false);
+  const [showPackingGuide, setShowPackingGuide] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- 現在の便セッション ---
+  const activeSession = useMemo(() => {
+    if (!workDay || !activeSlot) return null;
+    return workDay[activeSlot];
+  }, [workDay, activeSlot]);
+
+  // --- 現在の便の注文データ ---
+  const parsedData: ParsedData | null = activeSession?.data ?? null;
 
   // --- 現在のキャリアデータ ---
   const carrierData: CarrierData | null = useMemo(() => {
     if (!parsedData || !selectedCarrier) return null;
     return parsedData[selectedCarrier];
   }, [parsedData, selectedCarrier]);
+
+  // --- 進捗をセッションに書き戻して永続化 ---
+  useEffect(() => {
+    if (!workDay || !activeSlot || !selectedCarrier) return;
+    const session = workDay[activeSlot];
+    if (!session) return;
+
+    const updatedSession = {
+      ...session,
+      pickingChecked: { ...session.pickingChecked, [selectedCarrier]: pickingChecked },
+      packingSetChecked: packingSetChecked,
+      packingIdx: { ...session.packingIdx, [selectedCarrier]: currentPackingIdx },
+      packingDone: { ...session.packingDone, [selectedCarrier]: packingDoneList },
+    };
+    const updatedWorkDay: WorkDay = { ...workDay, [activeSlot]: updatedSession };
+
+    setWorkDay(updatedWorkDay);
+    saveWorkDay(updatedWorkDay);
+    // workDay自身を依存に入れると無限ループになるため意図的に除外している
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickingChecked, packingSetChecked, currentPackingIdx, packingDoneList, activeSlot, selectedCarrier]);
 
   // --- ピッキング進捗 ---
   const pickingProgress = useMemo(() => {
@@ -112,27 +166,97 @@ export default function App() {
 
     setIsLoading(true);
     setError("");
+    setNotice("");
 
     try {
       const data = await parseCSV(file);
-      setParsedData(data);
-      setPhase("home"); // キャリア選択へ
+
+      if (!workDay || !workDay.morning) {
+        // --- 初回アップロード: 午前便として登録 ---
+        const wd = workDay ?? createWorkDay();
+        const session = createSession("morning", data, collectMgmtNos(data));
+        const updated: WorkDay = { ...wd, morning: session };
+        setWorkDay(updated);
+        saveWorkDay(updated);
+        setNotice(`午前便として ${session.data.takkyubin.totalOrders + session.data.nekopos.totalOrders} 件を登録しました`);
+      } else {
+        // --- 2回目以降: 既存の管理番号との差分を午後便として登録 ---
+        const existing = [
+          ...workDay.morning.mgmtNos,
+          ...(workDay.afternoon?.mgmtNos ?? []),
+        ];
+        const { data: newData, newOrderCount, newMgmtNos } = extractNewOrders(data, existing);
+
+        if (newOrderCount === 0) {
+          setNotice("追加された注文はありませんでした。");
+        } else {
+          // 既存の午後便がある場合は統合せず上書き（同日中の再取り込みを想定）
+          const session = createSession("afternoon", newData, newMgmtNos);
+          // 既存の午後便の進捗があれば引き継ぐ
+          if (workDay.afternoon) {
+            session.pickingChecked = workDay.afternoon.pickingChecked;
+            session.packingSetChecked = workDay.afternoon.packingSetChecked;
+            session.packingIdx = workDay.afternoon.packingIdx;
+          }
+          const updated: WorkDay = { ...workDay, afternoon: session };
+          setWorkDay(updated);
+          saveWorkDay(updated);
+          setNotice(`午後便として ${newOrderCount} 件の新規注文を検出しました`);
+        }
+      }
+
+      setActiveSlot(null);
+      setSelectedCarrier(null);
+      setPhase("home");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "CSV解析に失敗しました。";
       setError(msg);
       console.error("[App] CSV解析エラー:", err);
     } finally {
       setIsLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }, [workDay]);
+
+  /** 便（午前便/午後便）を選択 */
+  const handleSlotSelect = useCallback((slot: ShipmentSlot) => {
+    setActiveSlot(slot);
+    setSelectedCarrier(null);
+    setNotice("");
   }, []);
 
-  const handleCarrierSelect = useCallback((carrier: "takkyubin" | "nekopos") => {
+  const handleCarrierSelect = useCallback((carrier: "takkyubin" | "nekopos", startIdx?: number) => {
+    // 選択した便・キャリアの保存済み進捗を復元する
+    const session = workDay && activeSlot ? workDay[activeSlot] : null;
     setSelectedCarrier(carrier);
-    setPickingChecked({});
-    setCurrentPackingIdx(0);
-    setPackingSetChecked({});
-    setPhase("picking");
-  }, []);
+    setPickingChecked(session?.pickingChecked?.[carrier] ?? {});
+    setPackingSetChecked(session?.packingSetChecked ?? {});
+    setPackingDoneList(session?.packingDone?.[carrier] ?? []);
+    setCurrentPackingIdx(startIdx ?? session?.packingIdx?.[carrier] ?? 0);
+    setCurrentPlatformIdx(0);
+    // 初回のみ説明バナーを表示
+    if (startIdx !== undefined) {
+      setShowPackingGuide(!hasSeenGuide("packing"));
+      setPhase("packing");
+    } else {
+      setShowPickingGuide(!hasSeenGuide("picking"));
+      setPhase("picking");
+    }
+  }, [workDay, activeSlot]);
+
+  /** 中断位置から梱包を再開 */
+  const handleResume = useCallback((slot: ShipmentSlot, carrier: "takkyubin" | "nekopos", index: number) => {
+    setActiveSlot(slot);
+    const session = workDay?.[slot] ?? null;
+    setSelectedCarrier(carrier);
+    setPickingChecked(session?.pickingChecked?.[carrier] ?? {});
+    setPackingSetChecked(session?.packingSetChecked ?? {});
+    setPackingDoneList(session?.packingDone?.[carrier] ?? []);
+    setCurrentPackingIdx(index);
+    setShowPackingGuide(!hasSeenGuide("packing"));
+    setNotice("");
+    setPhase("packing");
+  }, [workDay]);
 
   const handlePickingToggle = useCallback((itemName: string) => {
     setPickingChecked((prev) => ({ ...prev, [itemName]: !prev[itemName] }));
@@ -143,8 +267,7 @@ export default function App() {
   }, []);
 
   const handleStartPacking = useCallback(() => {
-    setCurrentPackingIdx(0);
-    setPackingSetChecked({});
+    setShowPackingGuide(!hasSeenGuide("packing"));
     setPhase("packing");
   }, []);
 
@@ -156,23 +279,59 @@ export default function App() {
     });
   }, []);
 
-  const handleNextOrder = useCallback(() => {
+  /** 梱包完了を記録して次の未完了注文へ */
+  const handleCompleteOrder = useCallback((mgmtNo: string) => {
     if (!carrierData) return;
-    const nextIdx = currentPackingIdx + 1;
-    if (nextIdx >= carrierData.orders.length) {
-      setPhase("packingSummary");
+    const nextDone = packingDoneList.includes(mgmtNo)
+      ? packingDoneList
+      : [...packingDoneList, mgmtNo];
+    setPackingDoneList(nextDone);
+
+    // 次の未完了注文を探す（現在位置より後 → 見つからなければ先頭から）
+    const doneSet = new Set(nextDone);
+    const orders = carrierData.orders;
+    let nextIdx = -1;
+    for (let i = currentPackingIdx + 1; i < orders.length; i++) {
+      if (!doneSet.has(orders[i].mgmtNo)) { nextIdx = i; break; }
+    }
+    if (nextIdx === -1) {
+      for (let i = 0; i < orders.length; i++) {
+        if (!doneSet.has(orders[i].mgmtNo)) { nextIdx = i; break; }
+      }
+    }
+
+    if (nextIdx === -1) {
+      setPhase("packingSummary");  // 全件完了
     } else {
       setCurrentPackingIdx(nextIdx);
     }
-  }, [carrierData, currentPackingIdx]);
+  }, [carrierData, packingDoneList, currentPackingIdx]);
 
-  const handleReset = useCallback(() => {
-    setParsedData(null);
+  /** 完了記録を取り消して再編集可能にする */
+  const handleUncompleteOrder = useCallback((mgmtNo: string) => {
+    setPackingDoneList((prev) => prev.filter((no) => no !== mgmtNo));
+  }, []);
+
+  /** 便選択画面に戻る（データは保持） */
+  const handleBackToHome = useCallback(() => {
+    setSelectedCarrier(null);
+    setActiveSlot(null);
+    setPhase("home");
+  }, []);
+
+  /** 新しい日を開始（全データ削除） */
+  const handleClearAll = useCallback(() => {
+    if (!confirm("本日の全データ（午前便・午後便の進捗を含む）を削除します。よろしいですか？")) return;
+    clearWorkDay();
+    setWorkDay(null);
+    setActiveSlot(null);
     setSelectedCarrier(null);
     setPickingChecked({});
     setCurrentPackingIdx(0);
     setPackingSetChecked({});
+    setPackingDoneList([]);
     setError("");
+    setNotice("");
     setPhase("home");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
@@ -190,6 +349,9 @@ export default function App() {
   // ============================================================
 
   if (phase === "home") {
+    const slots: ShipmentSlot[] = ["morning", "afternoon"];
+    const hasAnySession = !!(workDay?.morning || workDay?.afternoon);
+
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
@@ -205,40 +367,142 @@ export default function App() {
           </button>
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-[780px] mx-auto w-full">
-          {/* CSVアップロード */}
-          {!parsedData && (
-            <div className="w-full mb-8">
-              <p className="text-gray-400 text-center mb-4">
-                CROSS MALL 注文詳細CSVをアップロード
-              </p>
-              <label className="block w-full cursor-pointer">
-                <div className="border-2 border-dashed border-gray-700 hover:border-emerald-500 
-                                rounded-2xl p-8 text-center transition-colors">
-                  <p className="text-2xl mb-2">📄</p>
-                  <p className="text-gray-300 text-lg">
-                    {isLoading ? "解析中..." : "タップしてCSVを選択"}
+        <div className="flex-1 flex flex-col items-center p-6 max-w-[780px] mx-auto w-full">
+          {/* CSVアップロード（常時表示） */}
+          <div className="w-full mb-6">
+            <label className="block w-full cursor-pointer">
+              <div className="border-2 border-dashed border-gray-700 hover:border-emerald-500 
+                              rounded-2xl p-6 text-center transition-colors">
+                <p className="text-2xl mb-1">📄</p>
+                <p className="text-gray-300 text-base">
+                  {isLoading
+                    ? "解析中..."
+                    : hasAnySession
+                      ? "午後便のCSVをアップロード"
+                      : "CROSS MALL 注文詳細CSVをアップロード"}
+                </p>
+                {hasAnySession && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    新しい管理番号だけを午後便として抽出します
                   </p>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  disabled={isLoading}
-                />
-              </label>
-              {error && (
-                <p className="mt-4 text-red-400 text-center text-sm">{error}</p>
-              )}
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={isLoading}
+              />
+            </label>
+            {error && <p className="mt-3 text-red-400 text-center text-sm">{error}</p>}
+            {notice && <p className="mt-3 text-emerald-400 text-center text-sm">{notice}</p>}
+          </div>
+
+          {/* 便の選択 */}
+          {hasAnySession && !activeSlot && (
+            <div className="w-full">
+              <p className="text-gray-400 text-center mb-4">作業する便を選択してください</p>
+              <div className="space-y-3">
+                {slots.map((slot) => {
+                  const session = workDay?.[slot];
+                  if (!session) return null;
+                  const prog = getSessionProgress(session);
+                  const isMorning = slot === "morning";
+                  const pickPct = prog.pickingTotal > 0 ? (prog.pickingDone / prog.pickingTotal) * 100 : 0;
+                  const packPct = prog.packingTotal > 0 ? (prog.packingDone / prog.packingTotal) * 100 : 0;
+                  const allDone = prog.packingTotal > 0 && prog.packingDone >= prog.packingTotal;
+                  return (
+                    <div
+                      key={slot}
+                      className={`w-full rounded-2xl p-5 border-2 ${
+                        isMorning
+                          ? "bg-sky-950 border-sky-700"
+                          : "bg-orange-950 border-orange-700"
+                      }`}
+                    >
+                      <button onClick={() => handleSlotSelect(slot)} className="w-full text-left">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-xl font-bold ${isMorning ? "text-sky-300" : "text-orange-300"}`}>
+                            {SLOT_ICONS[slot]} {SLOT_LABELS[slot]}
+                          </p>
+                          <span className="text-2xl font-bold text-gray-200">{prog.totalOrders}件</span>
+                        </div>
+
+                        {/* ピッキング進捗 */}
+                        <div className="mt-3">
+                          <div className="flex justify-between text-sm text-gray-400 mb-1">
+                            <span>ピッキング</span>
+                            <span>
+                              {prog.pickingDone}/{prog.pickingTotal}
+                              {prog.pickingTotal > 0 && prog.pickingDone === prog.pickingTotal && " ✓"}
+                            </span>
+                          </div>
+                          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pickPct}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 梱包進捗 */}
+                        <div className="mt-2">
+                          <div className="flex justify-between text-sm text-gray-400 mb-1">
+                            <span>梱包</span>
+                            <span>
+                              {prog.packingDone}/{prog.packingTotal}
+                              {allDone && " ✓"}
+                            </span>
+                          </div>
+                          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${packPct}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 中断位置 */}
+                        {prog.resumeAt && prog.packingDone > 0 && (
+                          <p className="mt-2 text-xs text-amber-400">
+                            ⏸ {prog.resumeAt.label} {prog.resumeAt.index + 1}番目の注文で中断中
+                          </p>
+                        )}
+                        {allDone && (
+                          <p className="mt-2 text-xs text-emerald-400">✅ この便は完了しました</p>
+                        )}
+                      </button>
+
+                      {/* 中断位置から再開 */}
+                      {prog.resumeAt && prog.packingDone > 0 && (
+                        <button
+                          onClick={() => handleResume(slot, prog.resumeAt!.carrier, prog.resumeAt!.index)}
+                          className="w-full mt-3 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-base font-bold min-h-[48px]"
+                        >
+                          ▶ 中断した場所から再開
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={handleClearAll}
+                className="w-full mt-6 text-gray-500 hover:text-red-400 py-3 text-sm min-h-[48px]"
+              >
+                新しい日を開始（全データ削除）
+              </button>
             </div>
           )}
 
           {/* キャリア選択 */}
-          {parsedData && (
+          {parsedData && activeSlot && (
             <div className="w-full">
-              <p className="text-gray-400 text-center mb-6">配送方法を選択してください</p>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <span className={`px-3 py-1 rounded-lg text-sm font-bold ${
+                  activeSlot === "morning" ? "bg-sky-700 text-sky-100" : "bg-orange-700 text-orange-100"
+                }`}>
+                  {SLOT_ICONS[activeSlot]} {SLOT_LABELS[activeSlot]}
+                </span>
+                <span className="text-gray-400 text-sm">配送方法を選択</span>
+              </div>
               <div className="space-y-4">
                 {/* 宅急便 */}
                 <button
@@ -274,10 +538,10 @@ export default function App() {
               </div>
 
               <button
-                onClick={handleReset}
+                onClick={() => setActiveSlot(null)}
                 className="w-full mt-6 text-gray-500 hover:text-gray-300 py-3 text-sm min-h-[48px]"
               >
-                CSVを読み直す
+                ← 便の選択に戻る
               </button>
             </div>
           )}
@@ -361,19 +625,31 @@ export default function App() {
               <button onClick={() => { setSelectedCarrier(null); setPhase("home"); }} className="text-gray-400 hover:text-white min-h-[44px] px-2">
                 ← 戻る
               </button>
-              <h2 className="font-bold text-emerald-400">ピッキング ─ {carrierData.label}</h2>
-              <span className="text-sm text-gray-400">
-                {pickingProgress.done}/{pickingProgress.total}
+              <h2 className="font-bold text-emerald-400 flex items-center gap-2">
+                {activeSlot && (
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    activeSlot === "morning" ? "bg-sky-700 text-sky-100" : "bg-orange-700 text-orange-100"
+                  }`}>
+                    {SLOT_ICONS[activeSlot]} {SLOT_LABELS[activeSlot]}
+                  </span>
+                )}
+                <span>ピッキング ─ {carrierData.label}</span>
+              </h2>
+              <span className="text-sm font-bold text-emerald-300">
+                {pickingProgress.done}/{pickingProgress.total} 種
               </span>
             </div>
             {/* プログレスバー + ビュー切替 */}
             <div className="flex items-center gap-3 mt-2">
-              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
                   style={{ width: `${pickingProgress.total > 0 ? (pickingProgress.done / pickingProgress.total) * 100 : 0}%` }}
                 />
               </div>
+              <span className="shrink-0 text-xs text-gray-400 w-10 text-right">
+                {pickingProgress.total > 0 ? Math.round((pickingProgress.done / pickingProgress.total) * 100) : 0}%
+              </span>
               <button
                 onClick={() => {
                   setPickingViewMode((m) => (m === "list" ? "card" : "list"));
@@ -386,6 +662,26 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {/* 初回説明バナー */}
+        {showPickingGuide && (
+          <div className="bg-emerald-950 border-b border-emerald-800 px-4 py-3">
+            <div className="max-w-[780px] mx-auto flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-emerald-300 font-bold text-sm">📋 棚から商品を集めてチェックしましょう</p>
+                <p className="text-emerald-400/70 text-xs mt-1">
+                  ハード（プラットフォーム）別に並んでいます。すべて集め終わったら梱包へ進みます。
+                </p>
+              </div>
+              <button
+                onClick={() => { markGuideSeen("picking"); setShowPickingGuide(false); }}
+                className="shrink-0 text-emerald-400 hover:text-white text-sm px-3 py-2 min-h-[40px]"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ===== 一覧モード ===== */}
         {pickingViewMode === "list" && (
@@ -520,12 +816,18 @@ export default function App() {
         <div className="max-w-[780px] w-full text-center">
           <p className="text-5xl mb-4">✅</p>
           <h2 className="text-2xl font-bold text-emerald-400 mb-2">ピッキング完了</h2>
-          <p className="text-gray-400 mb-2">
-            {carrierData.label} ─ {carrierData.pickingItems.length}種のアイテムをピッキングしました
+          <p className="text-gray-400 mb-6">
+            {carrierData.label} ─ {pickingProgress.done}/{pickingProgress.total}種をチェックしました
           </p>
-          <p className="text-gray-500 text-sm mb-8">
-            次に {carrierData.totalOrders}件の注文を1件ずつ梱包します
-          </p>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6 text-left">
+            <p className="text-blue-300 font-bold mb-1">📦 次は梱包作業です</p>
+            <p className="text-gray-400 text-sm">
+              {carrierData.totalOrders}件の注文を1件ずつ梱包します。
+              各注文で全項目にチェックを入れると「梱包完了」ボタンが押せるようになります。
+            </p>
+          </div>
+
           <button
             onClick={handleStartPacking}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 
@@ -534,10 +836,16 @@ export default function App() {
             梱包を開始（{carrierData.totalOrders}件）
           </button>
           <button
-            onClick={handleReset}
+            onClick={() => setPhase("picking")}
+            className="w-full mt-3 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl text-base min-h-[48px]"
+          >
+            ← ピッキングに戻る
+          </button>
+          <button
+            onClick={handleBackToHome}
             className="w-full mt-3 text-gray-500 hover:text-gray-300 py-3 text-sm min-h-[48px]"
           >
-            ホームに戻る
+            便の選択に戻る
           </button>
         </div>
       </div>
@@ -640,6 +948,11 @@ export default function App() {
     const allItemsChecked =
       allCheckItems.length > 0 &&
       allCheckItems.every((item) => !!orderChecks[item.key]);
+    const uncheckedCount = allCheckItems.filter((item) => !orderChecks[item.key]).length;
+    const checkedCount = allCheckItems.length - uncheckedCount;
+    const isThisOrderDone = packingDoneList.includes(mgmtNo);
+    const doneCount = carrierData.orders.filter((o) => packingDoneList.includes(o.mgmtNo)).length;
+    const donePct = carrierData.orders.length > 0 ? (doneCount / carrierData.orders.length) * 100 : 0;
 
     return (
       <>
@@ -648,29 +961,101 @@ export default function App() {
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-10">
           <div className="max-w-[780px] mx-auto">
+            {/* 上段: 戻る / 便バッジ / キャリア */}
             <div className="flex items-center justify-between">
               <button onClick={() => setPhase("pickingSummary")} className="text-gray-400 hover:text-white min-h-[44px] px-2">
                 ← 戻る
               </button>
-              <h2 className="font-bold text-blue-400">
-                梱包 {currentPackingIdx + 1}/{carrierData.orders.length}
-              </h2>
-              <span className="text-sm text-gray-400">{carrierData.label}</span>
+              <div className="flex items-center gap-2">
+                {activeSlot && (
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    activeSlot === "morning" ? "bg-sky-700 text-sky-100" : "bg-orange-700 text-orange-100"
+                  }`}>
+                    {SLOT_ICONS[activeSlot]} {SLOT_LABELS[activeSlot]}
+                  </span>
+                )}
+                <span className="text-sm text-gray-400">{carrierData.label}</span>
+              </div>
+              <span className="w-12" />
             </div>
-            {/* プログレスバー */}
-            <div className="mt-2 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+
+            {/* 中段: 前後移動と現在位置 */}
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <button
+                onClick={() => setCurrentPackingIdx((i) => Math.max(0, i - 1))}
+                disabled={currentPackingIdx === 0}
+                className={`px-4 py-2 rounded-lg text-xl font-bold min-h-[48px] min-w-[56px] ${
+                  currentPackingIdx === 0
+                    ? "bg-gray-900 text-gray-700 cursor-not-allowed"
+                    : "bg-gray-800 hover:bg-gray-700 text-white"
+                }`}
+              >
+                ‹
+              </button>
+
+              <div className="text-center flex-1">
+                <p className="font-bold text-blue-400 text-lg">
+                  {currentPackingIdx + 1} / {carrierData.orders.length} 件目
+                </p>
+                <p className="text-xs text-gray-500">
+                  ✓ 完了 {doneCount}件 ／ 残り {carrierData.orders.length - doneCount}件
+                </p>
+              </div>
+
+              <button
+                onClick={() => setCurrentPackingIdx((i) => Math.min(carrierData.orders.length - 1, i + 1))}
+                disabled={currentPackingIdx >= carrierData.orders.length - 1}
+                className={`px-4 py-2 rounded-lg text-xl font-bold min-h-[48px] min-w-[56px] ${
+                  currentPackingIdx >= carrierData.orders.length - 1
+                    ? "bg-gray-900 text-gray-700 cursor-not-allowed"
+                    : "bg-gray-800 hover:bg-gray-700 text-white"
+                }`}
+              >
+                ›
+              </button>
+            </div>
+
+            {/* 完了ベースのプログレスバー */}
+            <div className="mt-2 h-2 bg-gray-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-blue-500 transition-all duration-300 rounded-full"
-                style={{ width: `${((currentPackingIdx + 1) / carrierData.orders.length) * 100}%` }}
+                style={{ width: `${donePct}%` }}
               />
             </div>
           </div>
         </header>
 
+        {/* 初回説明バナー */}
+        {showPackingGuide && (
+          <div className="bg-blue-950 border-b border-blue-800 px-4 py-3">
+            <div className="max-w-[780px] mx-auto flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-blue-300 font-bold text-sm">📦 商品を1件ずつ梱包します</p>
+                <p className="text-blue-400/70 text-xs mt-1">
+                  全項目にチェックを入れると下部の「梱包完了」ボタンが押せます。上部の ‹ › で前後の注文を確認できます。
+                </p>
+              </div>
+              <button
+                onClick={() => { markGuideSeen("packing"); setShowPackingGuide(false); }}
+                className="shrink-0 text-blue-400 hover:text-white text-sm px-3 py-2 min-h-[40px]"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-4">
           <div className="max-w-[780px] mx-auto">
             {/* 宛先情報 */}
-            <div className={`bg-gray-900 rounded-xl p-4 mb-4 border-2 ${shop.cardBorder}`}>
+            <div className={`bg-gray-900 rounded-xl p-4 mb-4 border-2 ${
+              isThisOrderDone ? "border-emerald-600" : shop.cardBorder
+            }`}>
+              {isThisOrderDone && (
+                <div className="bg-emerald-900/50 border border-emerald-700 rounded-lg px-3 py-2 mb-3">
+                  <p className="text-emerald-300 text-sm font-bold">✓ この注文は梱包完了しています</p>
+                </div>
+              )}
               <div className="flex items-start justify-between gap-2 mb-2">
                 <p className="text-lg font-bold flex-1">{currentOrder.recipientName} 様</p>
                 <span className={`shrink-0 px-3 py-1 rounded-lg text-sm font-bold ${shop.badge}`}>
@@ -802,47 +1187,37 @@ export default function App() {
           </div>
         </div>
 
-        {/* 底部ナビゲーション（常に表示） */}
+        {/* 底部: 梱包完了ボタンのみ（移動は上部の矢印から） */}
         <div className="sticky bottom-0 bg-gray-950 border-t border-gray-800 p-4">
-          <div className="max-w-[780px] mx-auto space-y-2">
-            {/* 梱包完了ボタン（全チェック時のみ） */}
-            {allItemsChecked && (
+          <div className="max-w-[780px] mx-auto">
+            {isThisOrderDone ? (
               <button
-                onClick={handleNextOrder}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 
-                           rounded-xl text-lg font-bold min-h-[56px]"
+                onClick={() => handleUncompleteOrder(mgmtNo)}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-emerald-300 py-4 
+                           rounded-xl text-lg font-bold min-h-[56px] border-2 border-emerald-700"
               >
-                {currentPackingIdx + 1 < carrierData.orders.length
-                  ? `梱包完了 → 次の注文 (${currentPackingIdx + 2}/${carrierData.orders.length})`
-                  : "梱包完了 → 全注文完了"}
+                ✓ 梱包完了済み（タップで取り消して再編集）
               </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => allItemsChecked && handleCompleteOrder(mgmtNo)}
+                  disabled={!allItemsChecked}
+                  className={`w-full py-4 rounded-xl text-lg font-bold min-h-[56px] transition-all ${
+                    allItemsChecked
+                      ? "bg-blue-600 hover:bg-blue-500 text-white"
+                      : "bg-blue-950/50 text-blue-300/30 cursor-not-allowed border border-blue-900/50"
+                  }`}
+                >
+                  梱包完了して次へ
+                </button>
+                {!allItemsChecked && (
+                  <p className="text-center text-amber-400 text-sm mt-2">
+                    あと {uncheckedCount} 項目チェックしてください（{checkedCount}/{allCheckItems.length}）
+                  </p>
+                )}
+              </>
             )}
-            {/* 前後ナビゲーション */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPackingIdx((i) => Math.max(0, i - 1))}
-                disabled={currentPackingIdx === 0}
-                className={`flex-1 py-3 rounded-xl text-base min-h-[48px] ${
-                  currentPackingIdx === 0
-                    ? "bg-gray-900 text-gray-700 cursor-not-allowed"
-                    : "bg-gray-800 hover:bg-gray-700 text-gray-300"
-                }`}
-              >
-                ‹ 前の注文
-              </button>
-              <button
-                onClick={() => {
-                  if (currentPackingIdx + 1 >= carrierData.orders.length) {
-                    setPhase("packingSummary");
-                  } else {
-                    setCurrentPackingIdx((i) => i + 1);
-                  }
-                }}
-                className="flex-1 py-3 rounded-xl text-base min-h-[48px] bg-gray-800 hover:bg-gray-700 text-gray-300"
-              >
-                次の注文 ›
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -885,7 +1260,7 @@ export default function App() {
               </button>
             )}
             <button
-              onClick={handleReset}
+              onClick={handleBackToHome}
               className="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 
                          rounded-xl text-lg min-h-[56px]"
             >
@@ -938,7 +1313,7 @@ export default function App() {
         <div className="text-center">
           <p className="text-gray-500 mb-4">予期しない状態です</p>
           <button
-            onClick={handleReset}
+            onClick={handleBackToHome}
             className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl min-h-[48px]"
           >
             ホームに戻る

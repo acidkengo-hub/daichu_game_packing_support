@@ -41,6 +41,8 @@ export type ShipmentSession = {
   packingSetChecked: Record<string, Record<string, boolean>>;
   /** 梱包の現在位置: キャリア → インデックス */
   packingIdx: Record<string, number>;
+  /** 梱包完了した注文: キャリア → 管理番号の配列 */
+  packingDone: Record<string, string[]>;
 };
 
 /** 1日分の作業単位 */
@@ -91,6 +93,7 @@ export function loadWorkDay(): WorkDay | null {
         session.pickingChecked = session.pickingChecked ?? {};
         session.packingSetChecked = session.packingSetChecked ?? {};
         session.packingIdx = session.packingIdx ?? {};
+        session.packingDone = session.packingDone ?? {};
         session.mgmtNos = session.mgmtNos ?? [];
       }
     }
@@ -213,6 +216,7 @@ export function createSession(
     pickingChecked: {},
     packingSetChecked: {},
     packingIdx: {},
+    packingDone: {},
   };
 }
 
@@ -237,6 +241,8 @@ export type SessionProgress = {
   /** 梱包: 完了した注文数 */
   packingDone: number;
   packingTotal: number;
+  /** 中断位置（最初の未完了注文）。全完了なら null */
+  resumeAt: { carrier: "takkyubin" | "nekopos"; index: number; label: string } | null;
 };
 
 /** セッションの進捗を集計 */
@@ -244,16 +250,27 @@ export function getSessionProgress(session: ShipmentSession): SessionProgress {
   let pickingDone = 0;
   let pickingTotal = 0;
   let packingDone = 0;
+  let resumeAt: SessionProgress["resumeAt"] = null;
 
   for (const carrierKey of ["takkyubin", "nekopos"] as const) {
     const carrier = session.data[carrierKey];
     const checked = session.pickingChecked[carrierKey] ?? {};
+    const doneList = session.packingDone[carrierKey] ?? [];
 
     pickingTotal += carrier.pickingItems.length;
     pickingDone += carrier.pickingItems.filter((item) => checked[item.name]).length;
 
-    // 梱包位置から完了数を推定
-    packingDone += session.packingIdx[carrierKey] ?? 0;
+    // 完了記録に含まれる注文だけを数える（前後移動しても正確）
+    const doneSet = new Set(doneList);
+    packingDone += carrier.orders.filter((o) => doneSet.has(o.mgmtNo)).length;
+
+    // 最初の未完了注文＝中断位置
+    if (!resumeAt) {
+      const idx = carrier.orders.findIndex((o) => !doneSet.has(o.mgmtNo));
+      if (idx >= 0) {
+        resumeAt = { carrier: carrierKey, index: idx, label: carrier.label };
+      }
+    }
   }
 
   const totalOrders = session.data.takkyubin.totalOrders + session.data.nekopos.totalOrders;
@@ -264,5 +281,59 @@ export function getSessionProgress(session: ShipmentSession): SessionProgress {
     pickingTotal,
     packingDone,
     packingTotal: totalOrders,
+    resumeAt,
   };
+}
+
+/** 指定キャリアの梱包完了済み管理番号のSetを取得 */
+export function getPackingDoneSet(
+  session: ShipmentSession | null,
+  carrier: string
+): Set<string> {
+  if (!session) return new Set();
+  return new Set(session.packingDone[carrier] ?? []);
+}
+
+// ============================================================
+// 初回説明バナーの表示管理
+// ============================================================
+
+const GUIDE_SEEN_KEY = "game-packing-guide-seen";
+
+export type GuideKey = "picking" | "packing";
+
+/** 説明バナーを既に見たか */
+export function hasSeenGuide(key: GuideKey): boolean {
+  try {
+    const stored = localStorage.getItem(GUIDE_SEEN_KEY);
+    if (!stored) return false;
+    const seen = JSON.parse(stored) as string[];
+    return Array.isArray(seen) && seen.includes(key);
+  } catch (err) {
+    console.error("[shipmentStore] ガイド状態の読み込みエラー:", err);
+    return false;
+  }
+}
+
+/** 説明バナーを見たことを記録 */
+export function markGuideSeen(key: GuideKey): void {
+  try {
+    const stored = localStorage.getItem(GUIDE_SEEN_KEY);
+    const seen: string[] = stored ? JSON.parse(stored) : [];
+    if (!seen.includes(key)) {
+      seen.push(key);
+      localStorage.setItem(GUIDE_SEEN_KEY, JSON.stringify(seen));
+    }
+  } catch (err) {
+    console.error("[shipmentStore] ガイド状態の保存エラー:", err);
+  }
+}
+
+/** 説明バナーの表示状態をリセット（設定画面から呼ぶ） */
+export function resetGuideSeen(): void {
+  try {
+    localStorage.removeItem(GUIDE_SEEN_KEY);
+  } catch (err) {
+    console.error("[shipmentStore] ガイド状態のリセットエラー:", err);
+  }
 }
