@@ -209,7 +209,7 @@ function buildProduct(row: string[]): Product {
 // ピッキングリスト構築（セット展開 + プラットフォーム横断集約）
 // ============================================================
 
-function buildPickingItems(orders: Order[]): PickingItem[] {
+export function buildPickingItems(orders: Order[]): PickingItem[] {
   // 集約マップ: name → { platform, totalQty, sources }
   const aggregated = new Map<
     string,
