@@ -324,13 +324,28 @@ const DEFAULT_SETS: SetDefinition[] = [
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
   { id: "dssyokigataset001", label: "DS初期型 すぐ遊べるセット", codes: ["dssyokigataset001"], prefixes: [], components: [
     { name: "DS本体(初期型)", qty: 1 }, { name: "USBケーブル(DS初期型充電用)", qty: 1 },
+    { name: "おまけソフト(DS)", qty: 1 },
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
   { id: "dsisuguset001", label: "DSi すぐ遊べるセット", codes: ["dsisuguset001"], prefixes: [], components: [
     { name: "DSi本体", qty: 1 }, { name: "3DS充電USBケーブル", qty: 1 },
+    { name: "おまけソフト(DS)", qty: 1 },
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
   { id: "dsillsuguset001", label: "DSi LL すぐ遊べるセット", codes: ["dsillsuguset001"], prefixes: [], components: [
     { name: "DSi LL本体", qty: 1 }, { name: "3DS充電USBケーブル", qty: 1 },
+    { name: "おまけソフト(DS)", qty: 1 },
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
+
+  // ============================================================
+  // Switch 2
+  // 属性1（外箱付き / 本体のみ / 外箱なし）で同梱物が変わる。
+  // 実際の切り替えは parsers.ts の buildProduct で行う。
+  // ここでは既定として「外箱なし すぐ遊べるセット」の内容を持たせる。
+  // ============================================================
+  { id: "2025122601", label: "Switch 2 すぐ遊べるセット", codes: ["2025122601"], prefixes: [], components: [
+    { name: "Switch2本体", qty: 1 }, { name: "Switch2 Joy-Con(L+R)", qty: 1 },
+    { name: "Switch2ドック", qty: 1 }, { name: "USBケーブル(Switch2)", qty: 1 },
+    { name: "HDMIケーブル", qty: 1 },
+  ]},
 
   // ============================================================
   // 3DS / New 3DS / 3DS LL / New 3DS LL / 2DS LL

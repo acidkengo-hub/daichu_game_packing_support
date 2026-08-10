@@ -149,6 +149,15 @@ function buildProduct(row: string[]): Product {
   const attr1 = getField(row, COL.ATTR1_NAME);
   let platform: Platform | string = detectPlatform(shortName, code);
 
+  // Switch 2 判定（商品コード or 商品名から。既存Switchより優先）
+  if (
+    code === "2025122601" ||
+    /switch\s*2|スイッチ\s*[2２]/i.test(name) ||
+    /switch\s*2|スイッチ\s*[2２]/i.test(shortName)
+  ) {
+    platform = "Switch2" as Platform;
+  }
+
   // ポケモン電池交換対象 → 特別グループに分類
   const isPokemon = isPokemonBatteryProduct(code);
   if (isPokemon) {
@@ -184,10 +193,34 @@ function buildProduct(row: string[]): Product {
     );
   }
 
+  // Switch 2 の構成切替: 属性1で3パターンに分岐する
+  //   「本体のみ」    → 本体1点のみ
+  //   「外箱付き」    → 外箱 + 純正ACアダプター込みの完全版
+  //   それ以外(外箱なし) → セット定義の既定値をそのまま使う
+  if (setDef && setDef.id === "2025122601") {
+    if (attr1.includes("本体のみ")) {
+      components = [{ name: "Switch2本体", qty: 1 }];
+    } else if (attr1.includes("外箱付")) {
+      components = [
+        { name: "Switch2外箱", qty: 1 },
+        { name: "Switch2本体", qty: 1 },
+        { name: "Switch2 Joy-Con(L+R)", qty: 1 },
+        { name: "Switch2ドック", qty: 1 },
+        { name: "USBケーブル(Switch2)", qty: 1 },
+        { name: "HDMIケーブル", qty: 1 },
+        { name: "ACアダプタ(Switch2純正)", qty: 1 },
+      ];
+    }
+  }
+
   // ポケモン用梱包アラート
   const alerts = setDef?.packingAlerts ? [...setDef.packingAlerts] : [];
   if (isPokemon) {
     alerts.push("ポケモンソフトは電池交換を行いましたか？");
+  }
+  // Switch 2 外箱付きの注意喚起
+  if (setDef && setDef.id === "2025122601" && attr1.includes("外箱付")) {
+    alerts.push("外箱はマリオカート版の場合がありますが中身は通常版です");
   }
 
   return {

@@ -23,6 +23,7 @@ export const PLATFORMS = [
   "Wii",
   "WiiU",
   "Switch",
+  "Switch2",
   "SS",
   "DC",
   "ポケモン（電池交換）",
@@ -56,6 +57,8 @@ export function detectPlatform(shortName: string, code: string): Platform {
   if (snL.startsWith("psvita")) return "PSVita";
   if (snL.startsWith("ds-") || snL.startsWith("ds ") || snL.startsWith("dsソフト")) return "DS";
   if (sn.includes("3DS") || sn.includes("3ds") || sn.includes("3ｄｓ") || sn.includes("2DS") || sn.includes("2ds")) return "3DS";
+  // Switch 2: 一般のSwitch判定より先に評価する（"Switch2"が"Switch"に食われるのを防ぐ）
+  if (/switch\s*2/i.test(sn) || /スイッチ\s*[2２]/.test(sn)) return "Switch2";
   // Switch: 英語 + カタカナ「スイッチ」の両方に対応
   if (snL.includes("switch") || sn.includes("スイッチ")) return "Switch";
   if (snL.startsWith("wiiu") || sn.startsWith("WiiU")) return "WiiU";
@@ -80,7 +83,8 @@ export function detectPlatform(shortName: string, code: string): Platform {
   if (cd.startsWith("vita") || cd.includes("psvita")) return "PSVita";
   if (cd.startsWith("ps") || cd.startsWith("pssyoki")) return "PS1";
 
-  // 任天堂系（順序重要: wiiu → wii, new3ds → 3ds → 2ds → ds）
+  // 任天堂系（順序重要: switch2 → switch, wiiu → wii, new3ds → 3ds → 2ds → ds）
+  if (cd === "2025122601" || /^switch\s*2/i.test(cd)) return "Switch2";
   if (cd.startsWith("switch")) return "Switch";
   if (cd.startsWith("wiiu") || cd.startsWith("2023081305")) return "WiiU";
   if (cd.startsWith("wii") || cd.startsWith("hajime") || cd.startsWith("handle") || cd.startsWith("remo") || cd.startsWith("tatakon") || cd.startsWith("merukari") || cd === "1") return "Wii";
