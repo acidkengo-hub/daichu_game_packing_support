@@ -116,6 +116,16 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "DUALSHOCK2", qty: 2 },
   ]},
 
+  // メルカリ専売: PS2厚型 すぐ遊べるセット（メモリーカード2種付）
+  { id: "amazon9060", label: "PS2厚型 すぐ遊べる(メモカ2種/メルカリ専売)", codes: ["amazon9060"], prefixes: [], components: [
+    { name: "PS2本体(厚型)", qty: 1 },
+    { name: "DUALSHOCK2", qty: 1 },
+    { name: "PS1メモリーカード(互換)", qty: 1 },
+    { name: "PS2メモリーカード(互換)", qty: 1 },
+    { name: "AVケーブル(PS系)", qty: 1 },
+    { name: "メガネケーブル", qty: 1 },
+  ]},
+
   // ============================================================
   // PS2 薄型 (SCPH-70000〜90000)
   // ※全セットにACアダプタ(PS2薄型)+メガネケーブル必須（.md未記載分も補完済み）

@@ -61,7 +61,9 @@ export function detectPlatform(shortName: string, code: string): Platform {
   if (/switch\s*2/i.test(sn) || /スイッチ\s*[2２]/.test(sn)) return "Switch2";
   // Switch: 英語 + カタカナ「スイッチ」の両方に対応
   if (snL.includes("switch") || sn.includes("スイッチ")) return "Switch";
-  if (snL.startsWith("wiiu") || sn.startsWith("WiiU")) return "WiiU";
+  // WiiU: 「WiiU」「Wii U」「wii u」など、スペースの有無を問わず判定する。
+  // ※ startsWith("wiiu") だけだと「Wii U 本体」が次行のWiiに落ちる（実データで確認）
+  if (/^wii\s*u/i.test(sn)) return "WiiU";
   if (snL.startsWith("wii")) return "Wii";
   if (snL.startsWith("sfc") || sn.includes("スーファミ")) return "SFC";
   if (snL.startsWith("gba") || snL.startsWith("gb ") || snL.startsWith("gb-") || snL.startsWith("gbポケ")) return "GB/GBA";
@@ -78,7 +80,7 @@ export function detectPlatform(shortName: string, code: string): Platform {
   if (cd.startsWith("ps5")) return "PS5";
   if (cd.startsWith("ps4") || cd.startsWith("dualshock4") || cd.startsWith("2679-003") || cd.startsWith("2679-004")) return "PS4";
   if (cd.startsWith("ps3") || cd.startsWith("dualshock3") || cd.startsWith("duals3") || cd.startsWith("dualshock3-") || cd.startsWith("2679-002901")) return "PS3";
-  if (cd.startsWith("ps2") || cd.startsWith("2679-002774") || cd.startsWith("amazon20240822") || cd.startsWith("mc1mc2set") || cd.startsWith("mcps")) return "PS2";
+  if (cd.startsWith("ps2") || cd.startsWith("2679-002774") || cd.startsWith("amazon20240822") || cd === "amazon9060" || cd.startsWith("mc1mc2set") || cd.startsWith("mcps")) return "PS2";
   if (cd.startsWith("psp") || cd.startsWith("pap-")) return "PSP";
   if (cd.startsWith("vita") || cd.includes("psvita")) return "PSVita";
   if (cd.startsWith("ps") || cd.startsWith("pssyoki")) return "PS1";
@@ -86,7 +88,7 @@ export function detectPlatform(shortName: string, code: string): Platform {
   // 任天堂系（順序重要: switch2 → switch, wiiu → wii, new3ds → 3ds → 2ds → ds）
   if (cd === "2025122601" || /^switch\s*2/i.test(cd)) return "Switch2";
   if (cd.startsWith("switch")) return "Switch";
-  if (cd.startsWith("wiiu") || cd.startsWith("2023081305")) return "WiiU";
+  if (/^wii\s*u/i.test(cd) || cd.startsWith("2023081305")) return "WiiU";
   if (cd.startsWith("wii") || cd.startsWith("hajime") || cd.startsWith("handle") || cd.startsWith("remo") || cd.startsWith("tatakon") || cd.startsWith("merukari") || cd === "1") return "Wii";
   if (cd.startsWith("new3ds") || cd.startsWith("3ds") || cd.startsWith("2ds") || cd.startsWith("monhun4")) return "3DS";
   if (cd.startsWith("dslite") || cd.startsWith("dssyoki") || cd.startsWith("dsi")) return "DS";
@@ -240,3 +242,37 @@ export function isPokemonBatteryProduct(code: string): boolean {
  * 通常のプラットフォーム分類とは別枠で表示される。
  */
 export const POKEMON_BATTERY_GROUP = "ポケモン（電池交換）" as const;
+
+// ============================================================
+// Wii 同時購入キャンペーン判定
+// ============================================================
+
+/**
+ * DAICHUのWii同時購入キャンペーン。
+ * 対象商品を1注文で合計2点以上購入すると、おまけソフトが1枚付く。
+ *
+ * 対象商品は商品名に「同時購入キャンペーン対象商品」と明示されている。
+ * 例:
+ *   wii リモコン( シロ ) ＋ wiiソフト「マリオパーティー9」セット★同時購入キャンペーン対象商品★
+ *   wii 付属品セット【ACアダプタ/AVケーブル/センサーバー】★同時購入キャンペーン対象商品★
+ */
+const WII_CAMPAIGN_MARKERS = [
+  "同時購入キャンペーン対象商品",
+  "同時購入キャンペーン対象",
+  "同時購入ｷｬﾝﾍﾟｰﾝ対象商品",
+];
+
+/** キャンペーン適用に必要な最低点数 */
+export const WII_CAMPAIGN_MIN_QTY = 2;
+
+/** おまけソフトの部品名（ピッキング集約キー兼、梱包チェック項目名） */
+export const WII_CAMPAIGN_BONUS_NAME = "おまけソフト(Wii・同時購入特典)";
+
+/**
+ * 商品名がWii同時購入キャンペーンの対象かどうか判定。
+ * 商品名で判定するため、新商品が追加されてもコード変更が不要。
+ */
+export function isWiiCampaignProduct(productName: string): boolean {
+  if (!productName) return false;
+  return WII_CAMPAIGN_MARKERS.some((m) => productName.includes(m));
+}

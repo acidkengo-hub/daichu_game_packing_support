@@ -5,7 +5,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import Papa from "papaparse";
-import { detectPlatform, comparePlatform, isPokemonBatteryProduct, POKEMON_BATTERY_GROUP, type Platform } from "./platformDetector";
+import { detectPlatform, comparePlatform, isPokemonBatteryProduct, POKEMON_BATTERY_GROUP, isWiiCampaignProduct, WII_CAMPAIGN_MIN_QTY, WII_CAMPAIGN_BONUS_NAME, type Platform } from "./platformDetector";
 import { findSetDefinition, type SetComponent } from "./setDefinitions";
 
 // ============================================================
@@ -407,22 +407,71 @@ export function parseCSV(file: File): Promise<ParsedData> {
           }
         }
 
+        // --- Wii同時購入キャンペーンの適用 ---
+        // 商品名に「同時購入キャンペーン対象商品」を含む商品が
+        // 1注文で合計2点以上なら、おまけソフトを1枚追加する。
+        // 注文単位の判定なので、商品単位の buildProduct ではなくここで行う。
+        const applyWiiCampaign = (products: Product[]): Product[] => {
+          const campaignQty = products
+            .filter((p) => isWiiCampaignProduct(p.name))
+            .reduce((sum, p) => sum + p.qty, 0);
+
+          if (campaignQty < WII_CAMPAIGN_MIN_QTY) return products;
+
+          // 対象商品のうち最初の1件におまけソフトを付与する。
+          // 枚数は点数に関わらず注文全体で1枚。
+          const idx = products.findIndex((p) => isWiiCampaignProduct(p.name));
+          if (idx < 0) return products;
+
+          const target = products[idx];
+          // 二重付与を防ぐ（同じCSVを読み直した場合など）
+          if (target.setComponents.some((c) => c.name === WII_CAMPAIGN_BONUS_NAME)) {
+            return products;
+          }
+
+          const patched: Product = {
+            ...target,
+            isSet: true, // 単品商品でもチェックリストを出すためセット扱いにする
+            setComponents: [
+              // 元が単品（同梱物なし）の場合、商品自体もチェック対象に含める
+              ...(target.setComponents.length > 0
+                ? target.setComponents
+                : [{ name: target.shortName || target.name, qty: 1 }]),
+              { name: WII_CAMPAIGN_BONUS_NAME, qty: 1 },
+            ],
+            packingAlerts: [
+              ...target.packingAlerts,
+              `同時購入キャンペーン対象が${campaignQty}点。おまけソフトを1枚同梱してください`,
+            ],
+          };
+
+          const next = [...products];
+          next[idx] = patched;
+          console.log(
+            `[parsers] Wii同時購入キャンペーン適用: 対象${campaignQty}点 → おまけソフト1枚を追加`
+          );
+          return next;
+        };
+
         // --- Order オブジェクト生成 ---
         const buildOrders = (
           map: Map<string, { order: Partial<Order>; products: Product[] }>
         ): Order[] => {
-          return Array.from(map.values()).map(({ order, products }) => ({
-            mgmtNo: order.mgmtNo!,
-            shopName: order.shopName ?? "",
-            ordererName: order.ordererName ?? "",
-            recipientName: order.recipientName ?? "",
-            recipientPostal: order.recipientPostal ?? "",
-            recipientAddr: order.recipientAddr ?? "",
-            recipientTel: order.recipientTel ?? "",
-            deliveryDate: order.deliveryDate ?? "",
-            products,
-            totalItems: products.reduce((sum, p) => sum + p.qty, 0),
-          }));
+          return Array.from(map.values()).map(({ order, products }) => {
+            const finalProducts = applyWiiCampaign(products);
+            return {
+              mgmtNo: order.mgmtNo!,
+              shopName: order.shopName ?? "",
+              ordererName: order.ordererName ?? "",
+              recipientName: order.recipientName ?? "",
+              recipientPostal: order.recipientPostal ?? "",
+              recipientAddr: order.recipientAddr ?? "",
+              recipientTel: order.recipientTel ?? "",
+              deliveryDate: order.deliveryDate ?? "",
+              products: finalProducts,
+              totalItems: finalProducts.reduce((sum, p) => sum + p.qty, 0),
+            };
+          });
         };
 
         const takkyubinOrderList = buildOrders(takkyubinOrders);
