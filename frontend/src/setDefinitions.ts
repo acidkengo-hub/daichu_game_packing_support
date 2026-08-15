@@ -334,15 +334,12 @@ const DEFAULT_SETS: SetDefinition[] = [
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
   { id: "dssyokigataset001", label: "DS初期型 すぐ遊べるセット", codes: ["dssyokigataset001"], prefixes: [], components: [
     { name: "DS本体(初期型)", qty: 1 }, { name: "USBケーブル(DS初期型充電用)", qty: 1 },
-    { name: "おまけソフト(DS)", qty: 1 },
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
   { id: "dsisuguset001", label: "DSi すぐ遊べるセット", codes: ["dsisuguset001"], prefixes: [], components: [
     { name: "DSi本体", qty: 1 }, { name: "3DS充電USBケーブル", qty: 1 },
-    { name: "おまけソフト(DS)", qty: 1 },
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
   { id: "dsillsuguset001", label: "DSi LL すぐ遊べるセット", codes: ["dsillsuguset001"], prefixes: [], components: [
     { name: "DSi LL本体", qty: 1 }, { name: "3DS充電USBケーブル", qty: 1 },
-    { name: "おまけソフト(DS)", qty: 1 },
   ], packingAlerts: ["本体にタッチペンは付属していますか？"], pickingExcludes: ["タッチペン"]},
 
   // ============================================================
