@@ -84,9 +84,32 @@ const P_PINK = palette("#be185d", "#831843", "#f9a8d4", "#fef08a");
 // プラットフォーム別の見た目
 // ============================================================
 
+/**
+ * ディテール（追加パーツ）の種類。
+ *
+ * 方針: 機能に由来する形（スロット・ボタン配置・画面）のみを扱う。
+ * ロゴ・書体・メーカー固有の配色は扱わない。
+ * この線引きにより、識別性を上げつつ特定製品の模倣を避けている。
+ */
+export const DETAIL_KEYS = [
+  "twoScreen",    // 二画面 + 十字とボタン（clamshell用）
+  "discSlot",     // 前面の細いディスクスロット（slab用）
+  "detachGrip",   // 左右の脱着グリップ（handheld用）
+  "dpadButtons",  // 十字ボタン + 2ボタン（handheld用）
+  "discRing",     // 中心リングと放射スリット（disc用）
+] as const;
+
+export type DetailKey = (typeof DETAIL_KEYS)[number];
+
 export type PlatformVisual = {
   shape: ShapeKey;
   palette: Palette;
+  /**
+   * 追加パーツ。任意にしているのが要点。
+   * 未指定のプラットフォームは素のシェイプのまま描かれるため、
+   * 作り込みを1つずつ段階的に足していける。
+   */
+  detail?: DetailKey;
 };
 
 /**
@@ -95,12 +118,15 @@ export type PlatformVisual = {
  * ★型を Record<Platform, PlatformVisual> にしているため、
  *   PLATFORMS に新しい要素を足すとこのオブジェクトが型エラーになる。
  *   「定義を忘れたまま本番に出る」事故をビルド時に防いでいる。
+ *
+ * detail は登場頻度の高い7プラットフォームから順に付けている。
+ * 未指定のものは素のシェイプで表示され、後から足しても他に影響しない。
  */
 export const PLATFORM_VISUALS: Record<Platform, PlatformVisual> = {
   PS1: { shape: "box", palette: P_SNOW },
   PS2: { shape: "tower", palette: P_INK },
-  PS3: { shape: "slab", palette: P_SLATE },
-  PS4: { shape: "slab", palette: P_BLUE },
+  PS3: { shape: "slab", palette: P_SLATE, detail: "discSlot" },
+  PS4: { shape: "slab", palette: P_BLUE, detail: "discSlot" },
   PS5: { shape: "tower", palette: P_SNOW },
   PSP: { shape: "handheld", palette: P_INK },
   PSVita: { shape: "handheld", palette: P_SLATE },
@@ -108,15 +134,15 @@ export const PLATFORM_VISUALS: Record<Platform, PlatformVisual> = {
   SFC: { shape: "box", palette: P_SNOW },
   N64: { shape: "blob", palette: P_PURPLE },
   GC: { shape: "box", palette: P_PURPLE },
-  "GB/GBA": { shape: "handheld", palette: P_GREEN },
-  DS: { shape: "clamshell", palette: P_SLATE },
-  "3DS": { shape: "clamshell", palette: P_TEAL },
+  "GB/GBA": { shape: "handheld", palette: P_GREEN, detail: "dpadButtons" },
+  DS: { shape: "clamshell", palette: P_SLATE, detail: "twoScreen" },
+  "3DS": { shape: "clamshell", palette: P_TEAL, detail: "twoScreen" },
   Wii: { shape: "tower", palette: P_SNOW },
   WiiU: { shape: "slab", palette: P_SNOW },
-  Switch: { shape: "handheld", palette: P_RED },
-  Switch2: { shape: "handheld", palette: P_INK },
+  Switch: { shape: "handheld", palette: P_RED, detail: "detachGrip" },
+  Switch2: { shape: "handheld", palette: P_INK, detail: "detachGrip" },
   SS: { shape: "box", palette: P_SLATE },
-  DC: { shape: "disc", palette: P_SNOW },
+  DC: { shape: "disc", palette: P_SNOW, detail: "discRing" },
   "ポケモン（電池交換）": { shape: "cartridge", palette: P_PINK },
   その他: { shape: "blob", palette: P_AMBER },
 };
@@ -165,6 +191,8 @@ export type Monster = {
   productLabel: string;
   shape: ShapeKey;
   palette: Palette;
+  /** 追加パーツ。未指定なら素のシェイプで描かれる */
+  detail?: DetailKey;
   tier: MonsterTier;
   isBoss: boolean;
   /** 最大HP = 梱包チェック項目の総数。残HP = 未チェック数 */
@@ -222,6 +250,7 @@ export function buildMonster(
     productLabel,
     shape: safeVisual.shape,
     palette: safeVisual.palette,
+    detail: safeVisual.detail,
     tier,
     isBoss,
     maxHp,

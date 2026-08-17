@@ -74,8 +74,14 @@ function Gallery() {
           const v = PLATFORM_VISUALS[platform];
           const m = buildMonster(platform, "テスト商品", 4, false);
           return (
-            <Cell key={platform} label={`${platform}\n${m.name}`}>
-              <MonsterSprite shape={v.shape} palette={v.palette} tier={2} size={100} />
+            <Cell key={platform} label={`${platform}${v.detail ? " ★" : ""}\n${m.name}`}>
+              <MonsterSprite
+                shape={v.shape}
+                palette={v.palette}
+                detail={v.detail}
+                tier={2}
+                size={100}
+              />
             </Cell>
           );
         })}
