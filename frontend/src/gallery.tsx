@@ -15,6 +15,7 @@ import "./index.css";
 import MonsterSprite from "./MonsterSprite";
 import RpgPackingScreen, { type CheckItem } from "./RpgPackingScreen";
 import QuestTitleScreen from "./QuestTitleScreen";
+import QuestClearScreen, { type DefeatedRecord } from "./QuestClearScreen";
 import {
   SHAPE_KEYS,
   PLATFORM_VISUALS,
@@ -35,6 +36,26 @@ function Cell({ label, children }: { label: string; children: React.ReactNode })
     </div>
   );
 }
+
+/**
+ * クリア画面プレビュー用の仮データ。
+ * 12体（最後の1体をボスにする）を機械的に生成する。
+ */
+const PREVIEW_DEFEATED: DefeatedRecord[] = (
+  ["PS3", "PS2", "3DS", "Switch", "Wii", "GB/GBA", "PS4", "DS", "FC", "DC", "PSP", "PS1"] as Platform[]
+).map((p, i, arr) => {
+  const isBoss = i === arr.length - 1;
+  const m = buildMonster(p, "テスト商品", 3 + (i % 5), isBoss);
+  return {
+    name: m.name,
+    shape: m.shape,
+    palette: m.palette,
+    detail: m.detail,
+    tier: m.tier,
+    exp: m.exp,
+    isBoss,
+  };
+});
 
 /**
  * 戦闘画面のプレビュー。
@@ -125,6 +146,22 @@ function Gallery() {
       <p className="text-xs text-gray-500 mb-6">
         本番ビルドには含まれません。shape-rendering="crispEdges" の効きと3面塗りを確認します。
       </p>
+
+      {/* --- クリア画面プレビュー --- */}
+      <h2 className="text-sm font-bold text-blue-300 mb-2">クリア画面プレビュー</h2>
+      <div className="border-2 border-gray-700 rounded overflow-hidden max-w-[820px] mb-10">
+        <QuestClearScreen
+          carrierLabel="ヤマト宅急便"
+          defeated={PREVIEW_DEFEATED}
+          totalItems={58}
+          totalExp={2840}
+          // 42分前を起点にする
+          startedAtIso={new Date(Date.now() - 42 * 60000).toISOString()}
+          nextCarrier={{ label: "ネコポス", count: 8 }}
+          onNextCarrier={() => alert("つぎの びんへ")}
+          onBackToHome={() => alert("メニューに もどる")}
+        />
+      </div>
 
       {/* --- タイトル画面プレビュー --- */}
       <h2 className="text-sm font-bold text-blue-300 mb-2">タイトル画面プレビュー</h2>
