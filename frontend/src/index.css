@@ -1,1 +1,99 @@
 @import "tailwindcss";
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RPG梱包モード（DAICHUクエスト）の演出
+   
+   Tailwind CSS v4 は設定をCSSに書く方式（CSSファースト）。
+   @theme で --animate-* を定義すると animate-* クラスとして使える。
+   
+   ★動かすのは transform と opacity のみ。
+     この2つはGPUの合成レイヤーだけで処理されるため、
+     レイアウトの再計算（リフロー）が発生しない。
+     width/top/left を動かすと毎フレーム再計算が走り、
+     非力な端末でコマ落ちする。現場のiPadを考慮した制約。
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@theme {
+  /* 敵の待機モーション。ゆっくり上下に浮く */
+  --animate-idle: idle 2.4s ease-in-out infinite;
+  /* 攻撃を受けたときの横揺れ */
+  --animate-hit: hit 0.28s steps(4, end) 1;
+  /* 撃破時に潰れて消える */
+  --animate-defeat: defeat 0.5s ease-in forwards;
+  /* ボス登場時の重い揺れ */
+  --animate-boss-appear: boss-appear 0.6s ease-out 1;
+  /* CLEAR文字が1字ずつ飛び込んでくる（delayを個別に与えて連続ヒット感を出す） */
+  --animate-clear-char: clear-char 0.45s cubic-bezier(0.2, 1.8, 0.35, 1) backwards;
+  /* CLEAR時の閃光。一瞬白く飛ぶ */
+  --animate-clear-flash: clear-flash 0.7s ease-out forwards;
+  /* 背後の集中線が回りながら開く */
+  --animate-clear-burst: clear-burst 1.2s ease-out forwards;
+  /* クリア後に文字がゆっくり脈打つ */
+  --animate-clear-pulse: clear-pulse 1.6s ease-in-out 1s infinite;
+  /* テキストの点滅（「▼」カーソルなど） */
+  --animate-blink: blink 1s steps(2, end) infinite;
+}
+
+@keyframes clear-char {
+  /* 1文字が画面奥から回転しながら着弾する */
+  0% { transform: scale(4) rotate(-25deg); opacity: 0; }
+  60% { transform: scale(0.8) rotate(6deg); opacity: 1; }
+  80% { transform: scale(1.15) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes clear-flash {
+  0% { opacity: 0; }
+  8% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+@keyframes clear-burst {
+  /* 集中線。scale と rotate だけを動かすのでリフローしない */
+  0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+  30% { opacity: 0.55; }
+  100% { transform: scale(1.6) rotate(45deg); opacity: 0.18; }
+}
+
+@keyframes clear-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes hit {
+  /* steps() を使うことでカクカクした昔のゲームらしい揺れになる */
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  50% { transform: translateX(8px); }
+  75% { transform: translateX(-4px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes defeat {
+  0% { transform: scale(1) translateY(0); opacity: 1; }
+  40% { transform: scale(1.15) translateY(-4px); opacity: 0.9; }
+  100% { transform: scale(0.2) translateY(30px); opacity: 0; }
+}
+
+@keyframes boss-appear {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes clear-in {
+  0% { transform: scale(3) rotate(-8deg); opacity: 0; }
+  55% { transform: scale(0.85) rotate(2deg); opacity: 1; }
+  75% { transform: scale(1.08) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
