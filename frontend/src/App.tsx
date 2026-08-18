@@ -27,6 +27,19 @@ import {
   markGuideSeen,
 } from "./shipmentStore";
 import SettingsScreen from "./SettingsScreen";
+// --- RPG梱包モード（DAICHUクエスト / シークレット） ---
+// ロゴ7回タップで解除される隠し機能。既存の梱包ロジックは変更せず、
+// 表示だけを差し替える構成にしている
+import {
+  registerTap,
+  isRetroModeEnabled,
+  toggleRetroMode,
+  disableRetroMode,
+} from "./secretUnlock";
+import { buildMonster } from "./monsterDefinitions";
+import RpgPackingScreen from "./RpgPackingScreen";
+import QuestTitleScreen from "./QuestTitleScreen";
+import QuestClearScreen, { type DefeatedRecord } from "./QuestClearScreen";
 
 // ============================================================
 // フェーズ型
@@ -104,6 +117,16 @@ export default function App() {
   const [showPickingGuide, setShowPickingGuide] = useState(false);
   const [showPackingGuide, setShowPackingGuide] = useState(false);
 
+  // ============================================================
+  // RPG梱包モード（DAICHUクエスト / シークレット）
+  // ============================================================
+  /** レトロモードが有効か。localStorage から初期値を復元する */
+  const [rpgMode, setRpgMode] = useState<boolean>(isRetroModeEnabled);
+  /** タイトル画面を表示中か。解除直後に1回だけ出す「幕開け」 */
+  const [showQuestTitle, setShowQuestTitle] = useState(false);
+  /** ロゴ連打のヒント表示（4回目以降に出る小さなドット） */
+  const [tapHint, setTapHint] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- 現在の便セッション ---
@@ -155,6 +178,80 @@ export default function App() {
     if (!carrierData || currentPackingIdx >= carrierData.orders.length) return null;
     return carrierData.orders[currentPackingIdx];
   }, [carrierData, currentPackingIdx]);
+
+  // ============================================================
+  // RPG梱包モード用の導出値
+  // ============================================================
+
+  /**
+   * 1注文あたりのチェック項目数を数える。
+   *
+   * 梱包画面の allCheckItems と同じ数え方をしている。
+   * これがモンスターのHPと経験値の元になる。
+   * 完全に同じ数にするためアラート類も含めているが、
+   * ここでは概算として扱う（クリア画面の集計用）
+   */
+  const countOrderItems = useCallback((order: Order): number => {
+    let count = 0;
+    for (const product of order.products) {
+      if (product.isSet && product.setComponents.length > 0) {
+        for (const comp of product.setComponents) {
+          count += comp.qty * product.qty;
+        }
+      } else {
+        count += product.qty;
+      }
+    }
+    return Math.max(1, count);
+  }, []);
+
+  /** 注文の代表プラットフォーム。最初の商品のものを使う */
+  const getOrderPlatform = useCallback((order: Order) => {
+    return order.products[0]?.platform ?? "その他";
+  }, []);
+
+  /** 注文の表示名。セット名または商品名 */
+  const getOrderLabel = useCallback((order: Order): string => {
+    const p = order.products[0];
+    if (!p) return "なぞの しなもの";
+    return p.name || p.shortName || "なぞの しなもの";
+  }, []);
+
+  /**
+   * クリア画面用の戦績。完了記録から導出する。
+   *
+   * 新しい state を持たず既存の packingDoneList から計算しているため、
+   * 進捗管理とズレることが構造的にない
+   */
+  const questResult = useMemo(() => {
+    if (!carrierData) {
+      return { defeated: [] as DefeatedRecord[], totalItems: 0, totalExp: 0 };
+    }
+    const doneSet = new Set(packingDoneList);
+    const doneOrders = carrierData.orders.filter((o) => doneSet.has(o.mgmtNo));
+
+    let totalItems = 0;
+    let totalExp = 0;
+    const defeated: DefeatedRecord[] = doneOrders.map((order, i) => {
+      const items = countOrderItems(order);
+      // 最後に倒した1体をボス扱いにする
+      const isBoss = i === doneOrders.length - 1;
+      const m = buildMonster(getOrderPlatform(order), getOrderLabel(order), items, isBoss);
+      totalItems += items;
+      totalExp += m.exp;
+      return {
+        name: m.name,
+        shape: m.shape,
+        palette: m.palette,
+        detail: m.detail,
+        tier: m.tier,
+        exp: m.exp,
+        isBoss,
+      };
+    });
+
+    return { defeated, totalItems, totalExp };
+  }, [carrierData, packingDoneList, countOrderItems, getOrderPlatform, getOrderLabel]);
 
   // ============================================================
   // ハンドラ
@@ -319,10 +416,35 @@ export default function App() {
     setPhase("home");
   }, []);
 
+  /**
+   * ロゴのタップ。7回連続でシークレットモードをトグルする。
+   *
+   * 判定本体は secretUnlock.ts の純粋関数に切り出してあるため、
+   * ここでは結果を受けて画面状態を更新するだけ。
+   */
+  const handleLogoTap = useCallback(() => {
+    const result = registerTap();
+    setTapHint(result.showHint ? result.count : 0);
+
+    if (!result.reached) return;
+
+    const enabled = toggleRetroMode();
+    setRpgMode(enabled);
+    setTapHint(0);
+    // ONにしたときだけタイトル画面を出す。OFFのときは静かに戻す
+    setShowQuestTitle(enabled);
+  }, []);
+
   /** 新しい日を開始（全データ削除） */
   const handleClearAll = useCallback(() => {
     if (!confirm("本日の全データ（午前便・午後便の進捗を含む）を削除します。よろしいですか？")) return;
     clearWorkDay();
+    // レトロモードも同時に解除する。翌朝出勤した人が意図せず
+    // ゲームモードを引き継がないようにするため。
+    // 再開には改めて7回タップが必要になる
+    disableRetroMode();
+    setRpgMode(false);
+    setShowQuestTitle(false);
     setWorkDay(null);
     setActiveSlot(null);
     setSelectedCarrier(null);
@@ -335,6 +457,16 @@ export default function App() {
     setPhase("home");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
+
+  // ============================================================
+  // DAICHUクエスト タイトル画面（シークレット解除直後に1回だけ）
+  // ============================================================
+  // 既存のホーム画面は改造せず、その手前に差し込む方式にしている。
+  // ホーム画面はCSV取込・便選択・進捗再開・データ削除を担う重い画面で、
+  // レトロ化すると既存機能を壊すリスクがあるため
+  if (showQuestTitle) {
+    return <QuestTitleScreen onStart={() => setShowQuestTitle(false)} />;
+  }
 
   // ============================================================
   // 設定画面
@@ -356,8 +488,23 @@ export default function App() {
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
         {/* ヘッダ */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-emerald-400">
+          {/*
+            ロゴ7回タップでシークレットモードを解除する。
+            iPad Safari では長押しがテキスト選択メニューを、
+            ダブルタップがズームを発動させるため、連続タップのみを使う。
+            select-none で文字選択も抑止している。
+          */}
+          <h1
+            onClick={handleLogoTap}
+            className="text-lg font-bold text-emerald-400 select-none cursor-default flex items-baseline gap-1"
+          >
             🎮 GAME PACKING SUPPORT
+            {/* 4回目以降だけ小さなドットが出る。解除までの目安になる */}
+            {tapHint > 0 && (
+              <span className="text-emerald-700 text-[10px] tracking-tighter">
+                {"·".repeat(tapHint)}
+              </span>
+            )}
           </h1>
           <button
             onClick={() => setPhase("settings")}
@@ -954,6 +1101,48 @@ export default function App() {
     const doneCount = carrierData.orders.filter((o) => packingDoneList.includes(o.mgmtNo)).length;
     const donePct = carrierData.orders.length > 0 ? (doneCount / carrierData.orders.length) * 100 : 0;
 
+    // ============================================================
+    // RPG梱包モード（DAICHUクエスト）
+    // ============================================================
+    // 既存の allCheckItems などをそのまま渡すだけで成立する。
+    // 下の既存JSXには一切手を入れていない
+    if (rpgMode) {
+      // 残り1件（この注文を倒せば全完了）ならボス扱いにする
+      const isLast = doneCount === carrierData.orders.length - 1 && !isThisOrderDone;
+      const monster = buildMonster(
+        currentOrder.products[0]?.platform ?? "その他",
+        getOrderLabel(currentOrder),
+        allCheckItems.length,
+        isLast
+      );
+      // 宛先の組み立て（既存画面と同じ情報を出す）
+      const recipient = currentOrder.recipientName || currentOrder.ordererName || "ななしの ぼうけんしゃ";
+
+      return (
+        <RpgPackingScreen
+          monster={monster}
+          orderKey={mgmtNo}
+          items={allCheckItems}
+          checked={orderChecks}
+          currentIndex={currentPackingIdx}
+          totalCount={carrierData.orders.length}
+          doneCount={doneCount}
+          totalExp={questResult.totalExp}
+          isLast={isLast}
+          recipientName={recipient}
+          deliveryDate={currentOrder.deliveryDate || ""}
+          isDone={isThisOrderDone}
+          onToggle={(key) => handlePackingSetToggle(mgmtNo, key)}
+          onComplete={() => handleCompleteOrder(mgmtNo)}
+          onPrev={() => setCurrentPackingIdx((i) => Math.max(0, i - 1))}
+          onNext={() =>
+            setCurrentPackingIdx((i) => Math.min(carrierData.orders.length - 1, i + 1))
+          }
+          onExit={() => setPhase("pickingSummary")}
+        />
+      );
+    }
+
     return (
       <>
       {imageModalEl}
@@ -1230,6 +1419,34 @@ export default function App() {
   // ============================================================
 
   if (phase === "packingSummary" && carrierData) {
+    // ============================================================
+    // RPG梱包モード: クリア画面
+    // ============================================================
+    if (rpgMode) {
+      // 別キャリアが残っていれば「つぎの びんへ」を出す
+      const otherKey = selectedCarrier === "takkyubin" ? "nekopos" : "takkyubin";
+      const other = parsedData?.[otherKey];
+      const nextCarrier =
+        other && other.totalOrders > 0
+          ? { label: other.label, count: other.totalOrders }
+          : null;
+
+      return (
+        <QuestClearScreen
+          carrierLabel={carrierData.label}
+          defeated={questResult.defeated}
+          totalItems={questResult.totalItems}
+          totalExp={questResult.totalExp}
+          // 経過時間の起点。取込時刻が取れない場合は現在時刻を渡し、
+          // 「1ふん」と表示されるだけで画面は壊れない
+          startedAtIso={activeSession?.uploadedAt ?? new Date().toISOString()}
+          nextCarrier={nextCarrier}
+          onNextCarrier={() => handleCarrierSelect(otherKey)}
+          onBackToHome={handleBackToHome}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-6">
         <div className="max-w-[780px] w-full text-center">
