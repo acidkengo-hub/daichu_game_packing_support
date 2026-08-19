@@ -79,12 +79,12 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "HDMIコンバーター(PS2用)", qty: 1 }, { name: "USBケーブル(コンバーター電源用)", qty: 1 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
-  { id: "ps2mc2sset", label: "PS2厚型 メモリーカード2種付", codes: ["ps2mc2sset", "ps210000-39000mc2set"], prefixes: [], components: [
+  { id: "ps2mc2sset", label: "PS2厚型 メモリーカード2種付", codes: ["ps2mc2sset", "ps210000-39000mc2set", "PS210000-39000mcset-2"], prefixes: [], components: [
     { name: "PS2本体(厚型)", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "DUALSHOCK2", qty: 1 }, { name: "AVケーブル(PS系)", qty: 1 },
     { name: "PS2メモリーカード(互換)", qty: 1 }, { name: "PS1メモリーカード(互換)", qty: 1 },
   ]},
-  { id: "ps21000039000mcset-3", label: "PS2厚型 純正メモリーカード付", codes: ["ps21000039000mcset-3", "PS210000-39000mcset-2"], prefixes: [], components: [
+  { id: "ps21000039000mcset-3", label: "PS2厚型 純正メモリーカード付", codes: ["ps21000039000mcset-3"], prefixes: [], components: [
     { name: "PS2本体(厚型)", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "DUALSHOCK2", qty: 1 }, { name: "AVケーブル(PS系)", qty: 1 },
     { name: "PS2メモリーカード(純正)", qty: 1 },
@@ -527,13 +527,13 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "Wiiリモコン", qty: 1 }, { name: "Wiiヌンチャク", qty: 1 },
     { name: "Wiiソフト「桃太郎電鉄16」", qty: 1 }, { name: "おまけソフト(Wii)", qty: 2 },
   ]},
-  { id: "wii4pmomotetsuset22", label: "Wii 桃鉄16(リモコン2本)", codes: ["wii4pmomotetsuset22", "wii2set-momotetsu16", "wii3p-momotetsu16"], prefixes: [], components: [
+  { id: "wii4pmomotetsuset22", label: "Wii 桃鉄16(リモコン2本)", codes: ["wii4pmomotetsuset22", "wii2set-momotetsu16"], prefixes: [], components: [
     { name: "Wii本体", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
     { name: "Wiiリモコン", qty: 2 }, { name: "Wiiヌンチャク", qty: 2 },
     { name: "Wiiソフト「桃太郎電鉄16」", qty: 1 }, { name: "おまけソフト(Wii)", qty: 2 },
   ]},
-  { id: "wii4pmomotetsuset23", label: "Wii 桃鉄16(リモコン3本)", codes: ["wii4pmomotetsuset23"], prefixes: [], components: [
+  { id: "wii4pmomotetsuset23", label: "Wii 桃鉄16(リモコン3本)", codes: ["wii4pmomotetsuset23", "wii3p-momotetsu16"], prefixes: [], components: [
     { name: "Wii本体", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
     { name: "Wiiリモコン", qty: 3 }, { name: "Wiiヌンチャク", qty: 3 },
@@ -546,13 +546,13 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "Wiiリモコン", qty: 1 }, { name: "Wiiヌンチャク", qty: 1 },
     { name: "Wiiソフト「桃太郎電鉄2010」", qty: 1 }, { name: "おまけソフト(Wii)", qty: 2 },
   ]},
-  { id: "wii4pmmt2isn", label: "Wii 桃鉄2010(リモコン2本)", codes: ["wii4pmmt2isn", "wii2set-momotetsu10", "wii3pset-momotetsu10"], prefixes: [], components: [
+  { id: "wii4pmmt2isn", label: "Wii 桃鉄2010(リモコン2本)", codes: ["wii4pmmt2isn", "wii2set-momotetsu10"], prefixes: [], components: [
     { name: "Wii本体", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
     { name: "Wiiリモコン", qty: 2 }, { name: "Wiiヌンチャク", qty: 2 },
     { name: "Wiiソフト「桃太郎電鉄2010」", qty: 1 }, { name: "おまけソフト(Wii)", qty: 2 },
   ]},
-  { id: "wii4pmomotetsuset3", label: "Wii 桃鉄2010(リモコン3本)", codes: ["wii4pmomotetsuset3"], prefixes: [], components: [
+  { id: "wii4pmomotetsuset3", label: "Wii 桃鉄2010(リモコン3本)", codes: ["wii4pmomotetsuset3", "wii3pset-momotetsu10"], prefixes: [], components: [
     { name: "Wii本体", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
     { name: "Wiiリモコン", qty: 3 }, { name: "Wiiヌンチャク", qty: 3 },
@@ -690,11 +690,11 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "WiiUソフト「マリオパーティ10」", qty: 1 }, { name: "Wiiリモコン", qty: 2 },
     { name: "Wiiセンサーバー", qty: 1 },
   ]},
-  { id: "wiiumarioparty10003", label: "マリオパーティ10+リモコン3+センサー", codes: ["wiiumarioparty10003", "wii-marioparty10-003", "wiiu-marioparty10-004"], prefixes: [], components: [
+  { id: "wiiumarioparty10003", label: "マリオパーティ10+リモコン3+センサー", codes: ["wiiumarioparty10003", "wii-marioparty10-003"], prefixes: [], components: [
     { name: "WiiUソフト「マリオパーティ10」", qty: 1 }, { name: "Wiiリモコン", qty: 3 },
     { name: "Wiiセンサーバー", qty: 1 },
   ]},
-  { id: "wiiumarioparty10004", label: "マリオパーティ10+リモコン4+センサー", codes: ["wiiumarioparty10004"], prefixes: [], components: [
+  { id: "wiiumarioparty10004", label: "マリオパーティ10+リモコン4+センサー", codes: ["wiiumarioparty10004", "wiiu-marioparty10-004"], prefixes: [], components: [
     { name: "WiiUソフト「マリオパーティ10」", qty: 1 }, { name: "Wiiリモコン", qty: 4 },
     { name: "Wiiセンサーバー", qty: 1 },
   ]},
