@@ -226,8 +226,14 @@ const DEFAULT_SETS: SetDefinition[] = [
   { id: "ps3500g213001", label: "PS3 HDD500GB換装パック", codes: ["ps3500g213001"], prefixes: [], components: []},
 
   // PS3 DUALSHOCK3 2個セット
-  { id: "dualshock3200001", label: "DUALSHOCK3 2個セット", codes: ["dualshock3200001", "dualshock3-2setblack", "duals3202101"], prefixes: [], components: [
+  { id: "dualshock3200001", label: "DUALSHOCK3 2個セット", codes: ["dualshock3200001", "dualshock3-2setblack"], prefixes: [], components: [
     { name: "DUALSHOCK3", qty: 2 }, { name: "USBケーブル(miniB/太)", qty: 2 },
+  ]},
+
+  // DUALSHOCK3 単品（USBケーブル1本付）
+  // ※ 商品コードが "duals3" で始まるため2個セットと誤って紐付けていた（2026-08-19 修正）
+  { id: "duals3202101", label: "DUALSHOCK3 単品(USBケーブル付)", codes: ["duals3202101"], prefixes: [], components: [
+    { name: "DUALSHOCK3", qty: 1 }, { name: "USBケーブル(miniB/太)", qty: 1 },
   ]},
 
   // PS3/PS4用ケーブルセット
