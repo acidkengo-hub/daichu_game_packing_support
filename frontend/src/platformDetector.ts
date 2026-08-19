@@ -249,11 +249,7 @@ export const POKEMON_BATTERY_GROUP = "ポケモン（電池交換）" as const;
 
 /**
  * DAICHUのWii同時購入キャンペーン。
- * 対象商品を1注文で複数購入すると、購入点数に応じておまけソフトが付く。
- *
- *   2点 → 1枚
- *   3点 → 2枚
- *   4点 → 3枚 …（点数 − 1 枚。上限なし）
+ * 対象商品を1注文で合計2点以上購入すると、おまけソフトが1枚付く。
  *
  * 対象商品は商品名に「同時購入キャンペーン対象商品」と明示されている。
  * 例:
@@ -264,6 +260,10 @@ const WII_CAMPAIGN_MARKERS = [
   "同時購入キャンペーン対象商品",
   "同時購入キャンペーン対象",
   "同時購入ｷｬﾝﾍﾟｰﾝ対象商品",
+  // 別表記（2026-08-19 に対象商品リストで確認）
+  // 例: wiiソフト「はじめてのwii」＋ wiiリモコン セット★ 同時購入プレゼントキャンペーン対象品 ★
+  "同時購入プレゼントキャンペーン対象品",
+  "同時購入プレゼントキャンペーン",
 ];
 
 /** キャンペーン適用に必要な最低点数 */
@@ -272,9 +272,6 @@ export const WII_CAMPAIGN_MIN_QTY = 2;
 /** おまけソフトの部品名（ピッキング集約キー兼、梱包チェック項目名） */
 export const WII_CAMPAIGN_BONUS_NAME = "おまけソフト(Wii・同時購入特典)";
 
-/** おまけソフトを載せる内部用の商品コード（CSVには存在しない） */
-export const WII_CAMPAIGN_BONUS_CODE = "__wii_campaign_bonus__";
-
 /**
  * 商品名がWii同時購入キャンペーンの対象かどうか判定。
  * 商品名で判定するため、新商品が追加されてもコード変更が不要。
@@ -282,14 +279,4 @@ export const WII_CAMPAIGN_BONUS_CODE = "__wii_campaign_bonus__";
 export function isWiiCampaignProduct(productName: string): boolean {
   if (!productName) return false;
   return WII_CAMPAIGN_MARKERS.some((m) => productName.includes(m));
-}
-
-/**
- * 対象商品の合計点数から、おまけソフトの枚数を計算する。
- * 2点で1枚、以降1点増えるごとに1枚増える（点数 − 1）。
- * 1点以下なら0枚。
- */
-export function calcWiiCampaignBonus(campaignQty: number): number {
-  if (campaignQty < WII_CAMPAIGN_MIN_QTY) return 0;
-  return campaignQty - 1;
 }
