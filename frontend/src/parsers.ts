@@ -5,7 +5,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import Papa from "papaparse";
-import { detectPlatform, comparePlatform, isPokemonBatteryProduct, POKEMON_BATTERY_GROUP, isWiiCampaignProduct, calcWiiCampaignBonus, WII_CAMPAIGN_BONUS_NAME, WII_CAMPAIGN_BONUS_CODE, type Platform } from "./platformDetector";
+import { detectPlatform, comparePlatform, isPokemonBatteryProduct, POKEMON_BATTERY_GROUP, isWiiCampaignProduct, calcWiiCampaignBonus, WII_CAMPAIGN_BONUS_NAME, WII_CAMPAIGN_BONUS_CODE, needsTouchPenCheck, isFlyerTargetProduct, type Platform } from "./platformDetector";
 import { findSetDefinition, type SetComponent } from "./setDefinitions";
 
 // ============================================================
@@ -24,6 +24,10 @@ export type Product = {
   isSet: boolean;        // セット商品フラグ
   setComponents: SetComponent[];  // セット同梱物リスト
   packingAlerts: string[];        // 梱包時アラート
+  /** タッチペン確認アラートが必要か（DS/3DSの本体、WiiUのゲームパッド） */
+  needsTouchPen: boolean;
+  /** チラシ同梱の対象になりうるか（本体を含む商品 or PSPオリジナルバッテリー） */
+  isFlyerTarget: boolean;
 };
 
 export type Order = {
@@ -185,9 +189,9 @@ function buildProduct(row: string[]): Product {
     }
   }
 
-  // カラーランダムの動的計算: DS系・3DS系でカラーランダムを選択された場合、
+  // カラーランダムの動的計算: DS系・3DS系・PSPでカラーランダムを選択された場合、
   // おまけソフトを2本にする（指定カラーは1本のまま）
-  if (setDef && (platform === "DS" || platform === "3DS") && attr1.includes("ランダム")) {
+  if (setDef && (platform === "DS" || platform === "3DS" || platform === "PSP") && attr1.includes("ランダム")) {
     components = components.map((c) =>
       c.name.startsWith("おまけソフト") ? { ...c, qty: 2 } : c
     );
@@ -223,6 +227,16 @@ function buildProduct(row: string[]): Product {
     alerts.push("外箱はマリオカート版の場合がありますが中身は通常版です");
   }
 
+  // --- タッチペン確認 / チラシ対象の判定 ---
+  // セット商品なら同梱物名、単品なら商品名・品目で判定する。
+  // 判定ロジックは platformDetector 側に集約している（付属品の誤判定を防ぐため）。
+  const namesToCheck = components.length > 0
+    ? components.map((c) => c.name)
+    : [displayName, name];
+
+  const needsTouchPen = needsTouchPenCheck(platform as Platform, namesToCheck);
+  const isFlyerTarget = isFlyerTargetProduct(code, namesToCheck);
+
   return {
     code,
     skuCode: getField(row, COL.SKU_CODE),
@@ -235,6 +249,8 @@ function buildProduct(row: string[]): Product {
     isSet,
     setComponents: components,
     packingAlerts: alerts,
+    needsTouchPen,
+    isFlyerTarget,
   };
 }
 
@@ -443,6 +459,9 @@ export function parseCSV(file: File): Promise<ParsedData> {
             packingAlerts: [
               `同時購入キャンペーン対象が${campaignQty}点です。おまけソフトを${bonusQty}枚同梱してください`,
             ],
+            // おまけソフト自体は本体ではないので、両フラグとも false
+            needsTouchPen: false,
+            isFlyerTarget: false,
           };
 
           console.log(

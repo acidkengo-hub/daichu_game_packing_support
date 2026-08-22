@@ -300,6 +300,11 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "DUALSHOCK4", qty: 2 }, { name: "USBケーブル(microB/細)", qty: 2 },
   ]},
 
+  // DUALSHOCK4 単品（USBケーブル1本付・選べる5色）
+  { id: "dualshock45colornew", label: "DUALSHOCK4 単品(USBケーブル付)", codes: ["dualshock45colornew"], prefixes: [], components: [
+    { name: "DUALSHOCK4", qty: 1 }, { name: "USBケーブル(microB/細)", qty: 1 },
+  ]},
+
   // ============================================================
   // PSP
   // ============================================================
@@ -670,6 +675,11 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "WiiU本体(ベーシック)", qty: 1 }, { name: "WiiUゲームパッド", qty: 1 },
     { name: "ACアダプタ(WiiU本体)", qty: 1 }, { name: "ACアダプタ(WiiUゲームパッド)", qty: 1 },
     { name: "HDMIケーブル", qty: 1 },
+  ]},
+
+  // WiiUゲームパッド 単品（タッチペン確認の対象）
+  { id: "wiiu-padonly", label: "WiiUゲームパッド 単品", codes: ["wiiu-padonly"], prefixes: [], components: [
+    { name: "WiiUゲームパッド", qty: 1 },
   ]},
   { id: "wiiusyuhenset001", label: "WiiU付属ケーブル3点セット", codes: ["wiiusyuhenset001", "wiiucable3set"], prefixes: [], components: [
     { name: "ACアダプタ(WiiU本体)", qty: 1 }, { name: "ACアダプタ(WiiUゲームパッド)", qty: 1 },

@@ -297,3 +297,92 @@ export function calcWiiCampaignBonus(campaignQty: number): number {
   if (campaignQty < WII_CAMPAIGN_MIN_QTY) return 0;
   return campaignQty - 1;
 }
+
+// ============================================================
+// 本体・ゲームパッドの判定（タッチペン確認 / チラシ確認に使用）
+// ============================================================
+
+/**
+ * 名前が「本体そのもの」を指しているか判定する。
+ *
+ * ★誤判定を避けるため2つの条件を課している:
+ *   1. 「本体」が最初のカッコより前に出ること
+ *      → "ACアダプタ(WiiU本体)" のような付属品を除外する
+ *   2. 「本体専用」「本体用」を含まないこと
+ *      → "WiiU 本体専用 ACアダプター" のような付属品を除外する
+ *
+ * 例:
+ *   "WiiU本体(プレミアム)"        → true   （本体）
+ *   "3DS 本体のみ"                → true   （本体）
+ *   "ACアダプタ(WiiU本体)"        → false  （付属品）
+ *   "WiiU 本体専用 ACアダプター"  → false  （付属品）
+ */
+export function isConsoleBodyName(name: string): boolean {
+  if (!name) return false;
+  if (/本体(専用|用)/.test(name)) return false;
+  return /^[^(（]*本体/.test(name);
+}
+
+/**
+ * 名前が「WiiUゲームパッドそのもの」を指しているか判定する。
+ * 本体判定と同じく、カッコ内の言及（付属品）は除外する。
+ *
+ * 例:
+ *   "WiiUゲームパッド"                 → true
+ *   "Nintendo Wii U Game pad 単品"     → true
+ *   "ACアダプタ(WiiUゲームパッド)"     → false （付属品）
+ */
+export function isGamePadName(name: string): boolean {
+  if (!name) return false;
+  return /^[^(（]*(ゲームパッド|game\s*pad)/i.test(name);
+}
+
+/**
+ * タッチペン確認アラートが必要か判定する。
+ *
+ * DS/3DS系はタッチペンが本体に、WiiUはゲームパッドに付属する。
+ * セット商品なら同梱物名、単品なら商品名を渡す。
+ *
+ * @param platform 判定されたプラットフォーム
+ * @param names    チェック対象の名前（同梱物名 または 商品名・品目）
+ */
+export function needsTouchPenCheck(platform: Platform, names: string[]): boolean {
+  if (platform === "DS" || platform === "3DS") {
+    return names.some(isConsoleBodyName);
+  }
+  if (platform === "WiiU") {
+    return names.some(isGamePadName);
+  }
+  return false;
+}
+
+// ============================================================
+// チラシ確認の対象判定
+// ============================================================
+
+/**
+ * ネコポスでもチラシが必要な例外商品（DAICHUオリジナルPSPバッテリー）。
+ * 本体を含まないが、おまけソフトキャンペーン対象のためチラシを同梱する。
+ */
+const FLYER_EXTRA_CODES = [
+  "pspbatoriginal1",
+  "pspbatorig2",
+  "pspbatorig3",
+  "pspbattoriginal-02",
+  "pspbattoriginal-03",
+];
+
+/**
+ * この商品がチラシ同梱の対象になりうるか判定する。
+ *
+ * ・本体を含む商品        → 対象
+ * ・DAICHUオリジナルPSPバッテリー → 対象（例外）
+ * ・ソフト単品、ケーブル等の付属品単品 → 対象外
+ *
+ * ※ ヤマト宅急便は商品によらず常にチラシを入れるため、
+ *   この判定はネコポスでのみ使用する。
+ */
+export function isFlyerTargetProduct(code: string, names: string[]): boolean {
+  if (FLYER_EXTRA_CODES.includes(code.toLowerCase())) return true;
+  return names.some(isConsoleBodyName);
+}

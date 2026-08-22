@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { parseCSV, type ParsedData, type CarrierData, type PickingItem, type Order } from "./parsers";
-import { type Platform, PLATFORMS, needsTouchPenAlert, POKEMON_BATTERY_GROUP } from "./platformDetector";
+import { type Platform, PLATFORMS, POKEMON_BATTERY_GROUP } from "./platformDetector";
 import { findSetDefinition } from "./setDefinitions";
 import { getSetImageUrl } from "./imageMapping";
 import { detectShop, isFlyerAlertEnabled, FLYER_ALERT_TEXT } from "./shopColors";
@@ -1038,7 +1038,14 @@ export default function App() {
     const allCheckItems: { label: string; key: string; isAlert?: boolean; index?: number; total?: number }[] = [];
 
     // チラシ同梱アラート（楽天・ヤフショのみ、設定でON時）
-    if (shop.needsFlyer && isFlyerAlertEnabled()) {
+    //   ヤマト宅急便 → 商品によらず常に表示
+    //   ヤマトネコポス → 本体を含む商品 or PSPオリジナルバッテリーがある場合のみ表示
+    //                   （ソフト単品・ケーブル単品などにはチラシを入れないため）
+    const flyerNeededForOrder =
+      selectedCarrier === "takkyubin" ||
+      currentOrder.products.some((p) => p.isFlyerTarget);
+
+    if (shop.needsFlyer && isFlyerAlertEnabled() && flyerNeededForOrder) {
       allCheckItems.push({
         label: FLYER_ALERT_TEXT,
         key: `alert_${FLYER_ALERT_TEXT}`,
@@ -1054,8 +1061,12 @@ export default function App() {
           allCheckItems.push({ label: alert, key: alertKey, isAlert: true });
         }
       }
-      if (product.isSet && needsTouchPenAlert(product.platform)) {
-        const tpAlert = "本体にタッチペンは付属していますか？";
+      // タッチペン確認: セット商品か単品かを問わず、
+      // 本体（DS/3DS）またはゲームパッド（WiiU）を含む商品で表示する
+      if (product.needsTouchPen) {
+        const tpAlert = product.platform === "WiiU"
+          ? "ゲームパッドにタッチペンは付属していますか？"
+          : "本体にタッチペンは付属していますか？";
         const tpKey = `alert_${tpAlert}`;
         if (!allCheckItems.some((item) => item.key === tpKey)) {
           allCheckItems.push({ label: tpAlert, key: tpKey, isAlert: true });
