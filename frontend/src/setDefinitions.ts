@@ -305,6 +305,11 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "DUALSHOCK4", qty: 1 }, { name: "USBケーブル(microB/細)", qty: 1 },
   ]},
 
+  // DualSense 単品（PS5用・Type-Cケーブル付）
+  { id: "dualsenseusbset", label: "DualSense 単品(USBケーブル付)", codes: ["dualsenseusbset"], prefixes: [], components: [
+    { name: "DUALSENSE", qty: 1 }, { name: "USBケーブル(TypeC-A)", qty: 1 },
+  ]},
+
   // ============================================================
   // PSP
   // ============================================================
@@ -488,6 +493,12 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
     { name: "Wiiリモコンプラス", qty: 1 }, { name: "Wiiヌンチャク", qty: 1 },
   ]},
+  // Wii HDMI変換アダプタ 単品（HDMIケーブル付）
+  // 正規化名は wiihdmiset001 と共通にして、ピッキングで合算されるようにする
+  { id: "wiihdmihenkanki", label: "Wii HDMI変換アダプタ(HDMIケーブル付)", codes: ["wiihdmihenkanki"], prefixes: [], components: [
+    { name: "HDMI変換器(Wii用)", qty: 1 }, { name: "HDMIケーブル", qty: 1 },
+  ]},
+
   { id: "wiihdmiset001", label: "Wii HDMI変換すぐ遊べる", codes: ["wiihdmiset001"], prefixes: [], components: [
     { name: "Wii本体", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },

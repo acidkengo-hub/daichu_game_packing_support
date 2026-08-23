@@ -26,6 +26,9 @@ export const SLOT_ICONS: Record<ShipmentSlot, string> = {
   afternoon: "🌇",
 };
 
+/** 梱包画面の並べ替えモード */
+export type PackingSortMode = "default" | "platform";
+
 /** 1便分のデータ + 作業進捗 */
 export type ShipmentSession = {
   slot: ShipmentSlot;
@@ -43,6 +46,8 @@ export type ShipmentSession = {
   packingIdx: Record<string, number>;
   /** 梱包完了した注文: キャリア → 管理番号の配列 */
   packingDone: Record<string, string[]>;
+  /** 梱包画面の並べ替えモード（伝票順 / ハード別） */
+  packingSortMode?: PackingSortMode;
 };
 
 /** 1日分の作業単位 */
@@ -94,6 +99,7 @@ export function loadWorkDay(): WorkDay | null {
         session.packingSetChecked = session.packingSetChecked ?? {};
         session.packingIdx = session.packingIdx ?? {};
         session.packingDone = session.packingDone ?? {};
+        session.packingSortMode = session.packingSortMode ?? "default";
         session.mgmtNos = session.mgmtNos ?? [];
       }
     }
@@ -217,6 +223,7 @@ export function createSession(
     packingSetChecked: {},
     packingIdx: {},
     packingDone: {},
+    packingSortMode: "default",
   };
 }
 

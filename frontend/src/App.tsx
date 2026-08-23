@@ -13,6 +13,7 @@ import { detectShop, isFlyerAlertEnabled, FLYER_ALERT_TEXT } from "./shopColors"
 import {
   type WorkDay,
   type ShipmentSlot,
+  type PackingSortMode,
   SLOT_LABELS,
   SLOT_ICONS,
   loadWorkDay,
@@ -108,6 +109,8 @@ export default function App() {
   const [currentPlatformIdx, setCurrentPlatformIdx] = useState(0);
   // 梱包
   const [currentPackingIdx, setCurrentPackingIdx] = useState(0);
+  /** 梱包の並べ替えモード（伝票順 / ハード別） */
+  const [packingSortMode, setPackingSortMode] = useState<PackingSortMode>("default");
   const [packingSetChecked, setPackingSetChecked] = useState<Record<string, Record<string, boolean>>>({});
   /** 梱包完了した管理番号（現在のキャリア分） */
   const [packingDoneList, setPackingDoneList] = useState<string[]>([]);
@@ -155,6 +158,7 @@ export default function App() {
       pickingChecked: { ...session.pickingChecked, [selectedCarrier]: pickingChecked },
       packingSetChecked: packingSetChecked,
       packingIdx: { ...session.packingIdx, [selectedCarrier]: currentPackingIdx },
+      packingSortMode,
       packingDone: { ...session.packingDone, [selectedCarrier]: packingDoneList },
     };
     const updatedWorkDay: WorkDay = { ...workDay, [activeSlot]: updatedSession };
@@ -163,7 +167,7 @@ export default function App() {
     saveWorkDay(updatedWorkDay);
     // workDay自身を依存に入れると無限ループになるため意図的に除外している
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickingChecked, packingSetChecked, currentPackingIdx, packingDoneList, activeSlot, selectedCarrier]);
+  }, [pickingChecked, packingSetChecked, currentPackingIdx, packingDoneList, packingSortMode, activeSlot, selectedCarrier]);
 
   // --- ピッキング進捗 ---
   const pickingProgress = useMemo(() => {
@@ -174,10 +178,38 @@ export default function App() {
   }, [carrierData, pickingChecked]);
 
   // --- 梱包進捗 ---
+  /**
+   * 梱包画面で表示する注文の並び。
+   *
+   * carrierData.orders 自体は書き換えず、派生した配列を作る。
+   * これによりピッキングやRPGモードへの影響がない。
+   *
+   * 完了記録（packingDoneList）は管理番号ベースなので、
+   * 並び順が変わっても進捗は壊れない。
+   */
+  const sortedOrders: Order[] = useMemo(() => {
+    if (!carrierData) return [];
+    if (packingSortMode === "default") return carrierData.orders;
+
+    // ハード別: PLATFORMS の表示順に並べ、同一ハード内は元の順序を維持する
+    const orderOf = (o: Order) => {
+      const p = o.products[0]?.platform ?? "その他";
+      const idx = PLATFORMS.indexOf(p as Platform);
+      return idx === -1 ? 999 : idx;
+    };
+    return carrierData.orders
+      .map((o, i) => ({ o, i }))
+      .sort((a, b) => {
+        const d = orderOf(a.o) - orderOf(b.o);
+        return d !== 0 ? d : a.i - b.i; // 安定ソート
+      })
+      .map((x) => x.o);
+  }, [carrierData, packingSortMode]);
+
   const currentOrder: Order | null = useMemo(() => {
-    if (!carrierData || currentPackingIdx >= carrierData.orders.length) return null;
-    return carrierData.orders[currentPackingIdx];
-  }, [carrierData, currentPackingIdx]);
+    if (currentPackingIdx >= sortedOrders.length) return null;
+    return sortedOrders[currentPackingIdx] ?? null;
+  }, [sortedOrders, currentPackingIdx]);
 
   // ============================================================
   // RPG梱包モード用の導出値
@@ -329,6 +361,7 @@ export default function App() {
     setPickingChecked(session?.pickingChecked?.[carrier] ?? {});
     setPackingSetChecked(session?.packingSetChecked ?? {});
     setPackingDoneList(session?.packingDone?.[carrier] ?? []);
+    setPackingSortMode(session?.packingSortMode ?? "default");
     setCurrentPackingIdx(startIdx ?? session?.packingIdx?.[carrier] ?? 0);
     setCurrentPlatformIdx(0);
     // 初回のみ説明バナーを表示
@@ -349,6 +382,7 @@ export default function App() {
     setPickingChecked(session?.pickingChecked?.[carrier] ?? {});
     setPackingSetChecked(session?.packingSetChecked ?? {});
     setPackingDoneList(session?.packingDone?.[carrier] ?? []);
+    setPackingSortMode(session?.packingSortMode ?? "default");
     setCurrentPackingIdx(index);
     setShowPackingGuide(!hasSeenGuide("packing"));
     setNotice("");
@@ -377,6 +411,45 @@ export default function App() {
   }, []);
 
   /** 梱包完了を記録して次の未完了注文へ */
+  /**
+   * 並べ替えモードを切り替える。
+   *
+   * 切り替えると表示順が変わるため、そのままでは別の注文に飛んでしまう。
+   * 切り替え前に見ていた管理番号を、切り替え後の配列で探し直して位置を合わせる。
+   */
+  const handleToggleSortMode = useCallback(() => {
+    if (!carrierData) return;
+    const keepMgmtNo = currentOrder?.mgmtNo;
+    const nextMode: PackingSortMode =
+      packingSortMode === "default" ? "platform" : "default";
+
+    // 切り替え後の並びを先に計算して、同じ注文の位置を求める
+    let nextList: Order[];
+    if (nextMode === "default") {
+      nextList = carrierData.orders;
+    } else {
+      const orderOf = (o: Order) => {
+        const p = o.products[0]?.platform ?? "その他";
+        const idx = PLATFORMS.indexOf(p as Platform);
+        return idx === -1 ? 999 : idx;
+      };
+      nextList = carrierData.orders
+        .map((o, i) => ({ o, i }))
+        .sort((a, b) => {
+          const d = orderOf(a.o) - orderOf(b.o);
+          return d !== 0 ? d : a.i - b.i;
+        })
+        .map((x) => x.o);
+    }
+
+    const nextIdx = keepMgmtNo
+      ? nextList.findIndex((o) => o.mgmtNo === keepMgmtNo)
+      : 0;
+
+    setPackingSortMode(nextMode);
+    setCurrentPackingIdx(nextIdx >= 0 ? nextIdx : 0);
+  }, [carrierData, currentOrder, packingSortMode]);
+
   const handleCompleteOrder = useCallback((mgmtNo: string) => {
     if (!carrierData) return;
     const nextDone = packingDoneList.includes(mgmtNo)
@@ -385,8 +458,9 @@ export default function App() {
     setPackingDoneList(nextDone);
 
     // 次の未完了注文を探す（現在位置より後 → 見つからなければ先頭から）
+    // ★並べ替え中は表示順（sortedOrders）を基準にする
     const doneSet = new Set(nextDone);
-    const orders = carrierData.orders;
+    const orders = sortedOrders;
     let nextIdx = -1;
     for (let i = currentPackingIdx + 1; i < orders.length; i++) {
       if (!doneSet.has(orders[i].mgmtNo)) { nextIdx = i; break; }
@@ -402,7 +476,7 @@ export default function App() {
     } else {
       setCurrentPackingIdx(nextIdx);
     }
-  }, [carrierData, packingDoneList, currentPackingIdx]);
+  }, [carrierData, sortedOrders, packingDoneList, currentPackingIdx]);
 
   /** 完了記録を取り消して再編集可能にする */
   const handleUncompleteOrder = useCallback((mgmtNo: string) => {
@@ -1176,7 +1250,17 @@ export default function App() {
                 )}
                 <span className="text-sm text-gray-400">{carrierData.label}</span>
               </div>
-              <span className="w-12" />
+              {/* 並べ替え切替 */}
+              <button
+                onClick={handleToggleSortMode}
+                className={`shrink-0 text-xs px-2 py-1 rounded min-h-[32px] ${
+                  packingSortMode === "platform"
+                    ? "bg-emerald-800 hover:bg-emerald-700 text-emerald-100"
+                    : "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                }`}
+              >
+                {packingSortMode === "platform" ? "🎮 ハード別" : "📋 伝票順"}
+              </button>
             </div>
 
             {/* 中段: 前後移動と現在位置 */}
@@ -1195,18 +1279,36 @@ export default function App() {
 
               <div className="text-center flex-1">
                 <p className="font-bold text-blue-400 text-lg">
-                  {currentPackingIdx + 1} / {carrierData.orders.length} 件目
+                  {currentPackingIdx + 1} / {sortedOrders.length} 件目
                 </p>
+                {/* ハード別のときは、そのハードの中で何件目かも出す */}
+                {packingSortMode === "platform" && currentOrder && (() => {
+                  const pf = currentOrder.products[0]?.platform ?? "その他";
+                  const same = sortedOrders.filter(
+                    (o) => (o.products[0]?.platform ?? "その他") === pf
+                  );
+                  const posInPf = same.findIndex((o) => o.mgmtNo === currentOrder.mgmtNo) + 1;
+                  return (
+                    <p className="text-sm">
+                      <span className="bg-emerald-800 text-emerald-100 px-2 py-0.5 rounded font-bold">
+                        {pf}
+                      </span>
+                      <span className="text-gray-400 ml-2">
+                        {posInPf} / {same.length} 件目
+                      </span>
+                    </p>
+                  );
+                })()}
                 <p className="text-xs text-gray-500">
-                  ✓ 完了 {doneCount}件 ／ 残り {carrierData.orders.length - doneCount}件
+                  ✓ 完了 {doneCount}件 ／ 残り {sortedOrders.length - doneCount}件
                 </p>
               </div>
 
               <button
-                onClick={() => setCurrentPackingIdx((i) => Math.min(carrierData.orders.length - 1, i + 1))}
-                disabled={currentPackingIdx >= carrierData.orders.length - 1}
+                onClick={() => setCurrentPackingIdx((i) => Math.min(sortedOrders.length - 1, i + 1))}
+                disabled={currentPackingIdx >= sortedOrders.length - 1}
                 className={`px-4 py-2 rounded-lg text-xl font-bold min-h-[48px] min-w-[56px] ${
-                  currentPackingIdx >= carrierData.orders.length - 1
+                  currentPackingIdx >= sortedOrders.length - 1
                     ? "bg-gray-900 text-gray-700 cursor-not-allowed"
                     : "bg-gray-800 hover:bg-gray-700 text-white"
                 }`}
