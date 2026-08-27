@@ -131,44 +131,47 @@ const DEFAULT_SETS: SetDefinition[] = [
   // ※全セットにACアダプタ(PS2薄型)+メガネケーブル必須（.md未記載分も補完済み）
   // ============================================================
   { id: "ps270-7701", label: "PS2薄型 すぐ遊べるセット", codes: ["ps270-7701", "PS27000-0-77000-00001", "ps27000-0-77000-00003"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/70000)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 1 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
   { id: "ps270-77202", label: "PS2薄型 コントローラー2個付", codes: ["ps270-77202", "PS27000-0-77000-00002"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/70000)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 2 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
   { id: "ps270-7733", label: "PS2薄型 純正コントローラー付", codes: ["ps270-7733"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/70000)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 1 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
   { id: "ps270-773g2", label: "PS2薄型 コントローラー2個(g2)", codes: ["ps270-773g2", "ps2-70000j-2suguasoberu"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/70000)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 2 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
   { id: "ps27077hdmi", label: "PS2薄型 HDMI変換セット", codes: ["ps27077hdmi"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/70000)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 1 },
     { name: "HDMIケーブル", qty: 1 }, { name: "HDMIコンバーター(PS2用)", qty: 1 },
     { name: "USBケーブル(コンバーター電源用)", qty: 1 }, { name: "AVケーブル(PS系)", qty: 1 },
   ]},
   { id: "ps277000pk", label: "PS2薄型 ピンク", codes: ["ps277000pk"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/70000)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 1 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
+  // --- PS2薄型 90000番台 ---
+  // ★90000番台はACアダプタ不要（メガネケーブルを本体に直挿しできる）。
+  //   70000番台は専用ACアダプタが必要なため、本体の正規化名も型番別に分けている。
   { id: "ps290000sredset", label: "PS2薄型 90000 シナバーレッド", codes: ["ps290000sredset"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/90000)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 1 },
     { name: "AVケーブル(PS系)", qty: 1 },
     { name: "PS1メモリーカード(純正)", qty: 1 }, { name: "PS2メモリーカード(純正)", qty: 1 },
   ]},
   { id: "ps290sug021401", label: "PS2薄型 90000 すぐ遊べる", codes: ["ps290sug021401", "ps290000suguasoberugokan"], prefixes: [], components: [
-    { name: "PS2本体(薄型)", qty: 1 }, { name: "ACアダプタ(PS2薄型)", qty: 1 },
+    { name: "PS2本体(薄型/90000)", qty: 1 },
     { name: "メガネケーブル", qty: 1 }, { name: "DUALSHOCK2", qty: 1 },
     { name: "AVケーブル(PS系)", qty: 1 },
   ]},
