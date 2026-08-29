@@ -80,7 +80,7 @@ export function detectPlatform(shortName: string, code: string): Platform {
   if (cd.startsWith("ps5") || cd.startsWith("dualsense")) return "PS5";
   if (cd.startsWith("ps4") || cd.startsWith("dualshock4") || cd.startsWith("2679-003") || cd.startsWith("2679-004")) return "PS4";
   if (cd.startsWith("ps3") || cd.startsWith("dualshock3") || cd.startsWith("duals3") || cd.startsWith("dualshock3-") || cd.startsWith("2679-002901")) return "PS3";
-  if (cd.startsWith("ps2") || cd.startsWith("2679-002774") || cd.startsWith("amazon20240822") || cd === "amazon9060" || cd.startsWith("mc1mc2set") || cd.startsWith("mcps")) return "PS2";
+  if (cd.startsWith("ps2") || cd.startsWith("2679-002774") || cd.startsWith("amazon20240822") || cd === "amazon9060" || cd === "amazon9129" || cd.startsWith("mc1mc2set") || cd.startsWith("mcps")) return "PS2";
   if (cd.startsWith("psp") || cd.startsWith("pap-")) return "PSP";
   if (cd.startsWith("vita") || cd.includes("psvita")) return "PSVita";
   if (cd.startsWith("ps") || cd.startsWith("pssyoki")) return "PS1";
