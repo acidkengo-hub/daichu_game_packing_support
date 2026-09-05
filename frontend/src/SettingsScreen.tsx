@@ -13,6 +13,14 @@ import {
   resetToDefaults,
 } from "./setDefinitions";
 import { isFlyerAlertEnabled, setFlyerAlertEnabled } from "./shopColors";
+import {
+  type FontSizeLevel,
+  FONT_SIZE_LABELS,
+  FONT_SIZE_PX,
+  getFontSize,
+  saveFontSize,
+  applyFontSize,
+} from "./uiSettings";
 
 // ============================================================
 // Props
@@ -46,6 +54,14 @@ export default function SettingsScreen({ onClose }: Props) {
   const [isNew, setIsNew] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [flyerAlert, setFlyerAlert] = useState<boolean>(isFlyerAlertEnabled);
+  const [fontSize, setFontSize] = useState<FontSizeLevel>(getFontSize);
+
+  // --- 文字サイズの変更（選んだ瞬間に画面へ反映する） ---
+  const handleChangeFontSize = useCallback((level: FontSizeLevel) => {
+    setFontSize(level);
+    saveFontSize(level);
+    applyFontSize(level);
+  }, []);
 
   // --- チラシ確認アラートのON/OFF ---
   const handleToggleFlyerAlert = useCallback(() => {
@@ -313,6 +329,40 @@ export default function SettingsScreen({ onClose }: Props) {
           >
             閉じる
           </button>
+        </div>
+
+        {/* 表示設定 */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
+          <p className="text-sm text-gray-400 mb-1">表示設定</p>
+          <p className="text-base font-bold mb-1">🔠 文字の大きさ</p>
+          <p className="text-xs text-gray-500 mb-3">
+            画面全体の文字が大きくなります（ボタンの押しやすさは変わりません）
+          </p>
+          <div className="flex gap-2">
+            {(["small", "medium", "large"] as const).map((level) => (
+              <button
+                key={level}
+                onClick={() => handleChangeFontSize(level)}
+                className={`flex-1 rounded-lg border-2 py-3 min-h-[56px] transition-colors ${
+                  fontSize === level
+                    ? "bg-emerald-700 border-emerald-500 text-white"
+                    : "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600"
+                }`}
+              >
+                {/* 選択肢そのものを、その大きさで表示して違いが分かるようにする */}
+                <span
+                  className="font-bold"
+                  style={{ fontSize: `${FONT_SIZE_PX[level]}px` }}
+                >
+                  {FONT_SIZE_LABELS[level]}
+                </span>
+                <span className="block text-xs text-gray-400 mt-0.5">
+                  {FONT_SIZE_PX[level]}px
+                  {level === "small" && "（標準）"}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 梱包オプション */}

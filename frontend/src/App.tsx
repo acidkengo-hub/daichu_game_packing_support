@@ -10,6 +10,7 @@ import { type Platform, PLATFORMS, POKEMON_BATTERY_GROUP } from "./platformDetec
 import { findSetDefinition } from "./setDefinitions";
 import { getSetImageUrl } from "./imageMapping";
 import { detectShop, isFlyerAlertEnabled, FLYER_ALERT_TEXT } from "./shopColors";
+import { initFontSize } from "./uiSettings";
 import {
   type WorkDay,
   type ShipmentSlot,
@@ -119,6 +120,12 @@ export default function App() {
   // 初回説明バナー
   const [showPickingGuide, setShowPickingGuide] = useState(false);
   const [showPackingGuide, setShowPackingGuide] = useState(false);
+
+  // --- 起動時に保存済みの文字サイズを適用する ---
+  // ルート要素の font-size を変えるだけなので、画面全体が比例して拡大される。
+  useEffect(() => {
+    initFontSize();
+  }, []);
 
   // ============================================================
   // RPG梱包モード（DAICHUクエスト / シークレット）
