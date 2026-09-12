@@ -18,6 +18,11 @@ export type Product = {
   name: string;          // 商品名 (col 15)
   shortName: string;     // 品目 (col 41)
   attr1: string;         // 属性１名 (col 18)
+  /**
+   * 属性グループ１名 (col 16)。「カラー」「セット内容」「容量」など選択肢の見出し。
+   * CSVに値がない場合や、おまけ商品など合成したProductでは undefined になる。
+   */
+  attr1Group?: string;
   attr2: string;         // 属性２名 (col 21)
   qty: number;           // 数量 (col 36)
   platform: Platform;    // 自動判定プラットフォーム
@@ -83,6 +88,8 @@ const COL = {
   DELIVERY_DATE: 11,   // 配送希望日
   PRODUCT_CODE:  14,   // 商品コード
   PRODUCT_NAME:  15,   // 商品名
+  ATTR1_GROUP:   16,   // 属性グループ１名（「カラー」「セット内容」等）
+  ATTR1_CODE:    17,   // 属性１コード（SKUの一部。表示名より安定した判定キー）
   ATTR1_NAME:    18,   // 属性１名
   ATTR2_NAME:    21,   // 属性２名
   QTY:           36,   // 数量
@@ -139,6 +146,24 @@ function isColorRelevant(componentName: string): boolean {
   );
 }
 
+/**
+ * 属性1名で電池本数が変わるWiiセットの商品コード（小文字で保持）。
+ *
+ * 属性1名には「シロ」「クロ」「シロ(電池2本セット)」「クロ(電池4本セット)」等が入る。
+ * ここに載っていないコードでは電池の動的追加を行わない
+ * （「電池」を含む他プラットフォーム商品での誤爆を防ぐため）。
+ *
+ * 新しい電池付きWiiセットが増えたら、この配列に1行追加する。
+ */
+const WII_BATTERY_CODES = [
+  "wiihdmiset001",
+  "wiikanpinset0001",
+  "wiinomal2pset0001",
+  "wiinomalbattset0001",
+  "wiinomalset0001",
+  "wiiplusset0001",
+];
+
 // ============================================================
 // Product 構築（セット定義照合含む）
 // ============================================================
@@ -151,6 +176,9 @@ function buildProduct(row: string[]): Product {
   const shortName = normalizeSpaces(rawShortName);
   const name = normalizeSpaces(rawName);
   const attr1 = getField(row, COL.ATTR1_NAME);
+  // 属性1コードは表示名と違いモール管理画面での文言変更に影響されない。
+  // 大小の揺れに備えて小文字で保持する
+  const attr1Code = getField(row, COL.ATTR1_CODE).toLowerCase();
   let platform: Platform | string = detectPlatform(shortName, code);
 
   // Switch 2 判定（商品コード or 商品名から。既存Switchより優先）
@@ -179,12 +207,29 @@ function buildProduct(row: string[]): Product {
   const setDef = findSetDefinition(code);
   const isSet = !!setDef && setDef.components.length > 0;
 
-  // 電池セットの動的計算: wiinomalbattset0001 は attr1 から電池本数を判定
+  // 電池セットの動的計算:
+  //   属性1名の「電池N本」から単三電池の本数を決める。
+  //   対象は WII_BATTERY_CODES に限定（他商品の「電池」表記での誤爆を防ぐ）。
+  //   「シロ」「クロ」のように電池の記載がない場合は電池を追加しない。
+  //   ただし wiinomalbattset0001 は商品自体が「電池付」なので、
+  //   記載がなくても2本を維持する（従来動作の後方互換）。
   let components = setDef?.components ? [...setDef.components] : [];
-  if (setDef && code.toLowerCase().startsWith("wiinomalbattset")) {
-    const batteryQty = attr1.includes("4本") ? 4 : 2;
-    // 既存の電池componentがなければ追加
-    if (!components.some((c) => c.name === "単三電池")) {
+  if (setDef && WII_BATTERY_CODES.includes(code.toLowerCase())) {
+    // 楽天側で全角数字が入る可能性があるため半角に寄せてから照合する
+    const attrNorm = attr1.replace(/[０-９]/g, (ch) =>
+      String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
+    );
+    const matched = attrNorm.match(/電池\s*(\d+)\s*本/);
+
+    let batteryQty = 0;
+    if (matched) {
+      batteryQty = parseInt(matched[1], 10);
+    } else if (code.toLowerCase() === "wiinomalbattset0001") {
+      batteryQty = 2;
+    }
+
+    // 既存の電池componentがなければ追加（定義側と二重計上しない）
+    if (batteryQty > 0 && !components.some((c) => c.name === "単三電池")) {
       components = [...components, { name: "単三電池", qty: batteryQty }];
     }
   }
@@ -217,6 +262,24 @@ function buildProduct(row: string[]): Product {
     }
   }
 
+  // ディスクシステムの構成切替: 属性1コードで3パターンに分岐する
+  //   hontai    → 本体のみ
+  //   acset     → 本体 + 電源アダプター（セット定義の既定値をそのまま使う）
+  //   acramset  → 本体 + 電源アダプター + RAMアダプター
+  // 属性1名（「本体のみ」等）ではなく属性1コードで判定している。
+  // 表示名はモール側で変更されうるが、コードはSKUの一部なので安定しているため
+  if (setDef && setDef.id === "discsystemset01") {
+    if (attr1Code === "hontai") {
+      components = [{ name: "ディスクシステム本体", qty: 1 }];
+    } else if (attr1Code === "acramset") {
+      components = [
+        { name: "ディスクシステム本体", qty: 1 },
+        { name: "電源アダプター(ディスクシステム)", qty: 1 },
+        { name: "RAMアダプター(ディスクシステム)", qty: 1 },
+      ];
+    }
+  }
+
   // ポケモン用梱包アラート
   const alerts = setDef?.packingAlerts ? [...setDef.packingAlerts] : [];
   if (isPokemon) {
@@ -243,6 +306,7 @@ function buildProduct(row: string[]): Product {
     name,
     shortName: displayName,
     attr1,
+    attr1Group: getField(row, COL.ATTR1_GROUP),
     attr2: getField(row, COL.ATTR2_NAME),
     qty: getNumField(row, COL.QTY),
     platform: platform as Platform,

@@ -1444,7 +1444,10 @@ export default function App() {
                   <p className="text-xs text-gray-500 mt-1">{product.code}</p>
                   {product.attr1 && (
                     <p className="text-base text-amber-300 font-bold mt-1">
-                      カラー: {product.attr1}
+                      {/* 見出しはCSVの属性グループ１名（列16）を使う。
+                          「カラー」だけでなく「セット内容」「容量」等が入るため。
+                          値がないCSVや合成Productでは従来どおり「カラー」にフォールバックする */}
+                      {product.attr1Group || "カラー"}: {product.attr1}
                     </p>
                   )}
                   {product.attr2 && (

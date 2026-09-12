@@ -89,7 +89,7 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "DUALSHOCK2", qty: 1 }, { name: "AVケーブル(PS系)", qty: 1 },
     { name: "PS2メモリーカード(純正)", qty: 1 },
   ]},
-  { id: "ps21000039000mcset", label: "PS2厚型 メモリーカード付カラー選択", codes: ["ps21000039000mcset", "PS210000-39000mcset"], prefixes: [], components: [
+  { id: "ps21000039000mcset", label: "PS2厚型 メモリーカード付カラー選択", codes: ["ps21000039000mcset", "PS210000-39000mcset", "ps2atsugatacolorset"], prefixes: [], components: [
     { name: "PS2本体(厚型)", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "DUALSHOCK2", qty: 1 }, { name: "AVケーブル(PS系)", qty: 1 },
     { name: "PS2メモリーカード(純正)", qty: 1 },
@@ -297,29 +297,32 @@ const DEFAULT_SETS: SetDefinition[] = [
   // ============================================================
   // PS4 Pro / 7000番台 (CUH-7000〜7200)
   // ============================================================
+  // PS4 Pro は本体の型番により電源ケーブルがメガネ型と二芯型に分かれる。
+  // どちらが必要かは棚で本体を手に取った時点で判明するため、
+  // 部品名は "メガネケーブル"（他PS系セットと合算される集約キー）のまま据え置き、
+  // 梱包時のアラートで確認を促す方式にした。
   { id: "ps4projyunsei", label: "PS4 Pro 純正コントローラー付", codes: ["ps4projyunsei"], prefixes: [], components: [
     { name: "PS4 Pro本体", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "DUALSHOCK4", qty: 1 }, { name: "USBケーブル(microB/細)", qty: 1 },
     { name: "HDMIケーブル", qty: 1 },
-  ]},
+  ], packingAlerts: ["本体の型番を確認し、メガネケーブルか二芯ケーブルか正しい方を入れましたか？"]},
   { id: "ps4projyunsei-kyu", label: "PS4 Pro 純正コントローラー付(旧)", codes: ["ps4projyunsei-kyu", "ps4projyunseikyu"], prefixes: [], components: [
     { name: "PS4 Pro本体", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "DUALSHOCK4", qty: 1 }, { name: "USBケーブル(microB/細)", qty: 1 },
     { name: "HDMIケーブル", qty: 1 },
-  ]},
+  ], packingAlerts: ["本体の型番を確認し、メガネケーブルか二芯ケーブルか正しい方を入れましたか？"]},
   { id: "2679-003352", label: "PS4 Pro 互換コントローラー(白)", codes: ["2679-003352"], prefixes: [], components: [
     { name: "PS4 Pro本体", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "互換コントローラー(PS4有線)", qty: 1 }, { name: "HDMIケーブル", qty: 1 },
-  ]},
+  ], packingAlerts: ["本体の型番を確認し、メガネケーブルか二芯ケーブルか正しい方を入れましたか？"]},
   { id: "2679-004185", label: "PS4 Pro 7200 箱付", codes: ["2679-004185"], prefixes: [], components: [
     { name: "PS4 Pro本体", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "互換コントローラー(PS4有線)", qty: 1 }, { name: "HDMIケーブル", qty: 1 },
-  ]},
+  ], packingAlerts: ["本体の型番を確認し、メガネケーブルか二芯ケーブルか正しい方を入れましたか？"]},
   { id: "2679-004394", label: "PS4 Pro ブラック", codes: ["2679-004394"], prefixes: [], components: [
     { name: "PS4 Pro本体", qty: 1 }, { name: "メガネケーブル", qty: 1 },
     { name: "互換コントローラー(PS4有線)", qty: 1 }, { name: "HDMIケーブル", qty: 1 },
-  ]},
-
+  ], packingAlerts: ["本体の型番を確認し、メガネケーブルか二芯ケーブルか正しい方を入れましたか？"]},
   // DUALSHOCK4 2個セット
   { id: "DUALSHOCK4doublepack", label: "DUALSHOCK4 2個セット", codes: ["DUALSHOCK4doublepack"], prefixes: [], components: [
     { name: "DUALSHOCK4", qty: 2 }, { name: "USBケーブル(microB/細)", qty: 2 },
@@ -534,6 +537,16 @@ const DEFAULT_SETS: SetDefinition[] = [
     { name: "Wii本体", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
     { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
     { name: "Wiiリモコン", qty: 1 }, { name: "Wiiヌンチャク", qty: 1 },
+  ]},
+  // 箱・説明書つきの完品セット。電池本数は属性1名から動的に追加される
+  // （parsers.ts の WII_BATTERY_CODES を参照）
+  { id: "wiikanpinset0001", label: "Wii 完品セット(箱・説明書付)", codes: ["wiikanpinset0001"], prefixes: [], components: [
+    { name: "Wii外箱", qty: 1 }, { name: "Wii内箱", qty: 1 },
+    { name: "Wii説明書", qty: 1 }, { name: "Wii本体", qty: 1 },
+    { name: "Wii本体スタンド", qty: 1 }, { name: "ACアダプタ(Wii)", qty: 1 },
+    { name: "AVケーブル(Wii)", qty: 1 }, { name: "Wiiセンサーバー", qty: 1 },
+    { name: "Wiiリモコン", qty: 1 }, { name: "Wiiリモコンジャケット", qty: 1 },
+    { name: "Wiiヌンチャク", qty: 1 },
   ]},
   { id: "wiihuzokuhinset001", label: "Wii 付属品3点セット", codes: ["wiihuzokuhinset001"], prefixes: [], components: [
     { name: "ACアダプタ(Wii)", qty: 1 }, { name: "AVケーブル(Wii)", qty: 1 },
